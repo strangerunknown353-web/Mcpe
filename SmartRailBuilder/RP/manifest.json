@@ -1,0 +1,24 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "pack.name",
+    "description": "pack.description",
+    "uuid": "fa25588d-d4e5-4b3f-acec-d3103b1799a9",
+    "version": [0, 1, 10],
+    "min_engine_version": [1, 26, 0]
+  },
+  "modules": [
+    {
+      "description": "Smart Rail Builder resource module (localization now, icons/UI textures later)",
+      "type": "resources",
+      "uuid": "237e6561-9efc-4cf2-a14f-e37885e37835",
+      "version": [0, 1, 10]
+    }
+  ],
+  "metadata": {
+    "authors": ["Ryzen"],
+    "generated_with": {
+      "ryzen_manual": ["0.1.0"]
+    }
+  }
+}
