@@ -47,7 +47,20 @@ export const ADDON = Object.freeze({
   // confirmed in sync. Bumped to 0.1.20 for Project Prompt 27 (Final
   // Engineering, Bug Fixing, Compatibility & Stability Pass) — see
   // CHANGELOG.md's Project Prompt 27 entry.
-  VERSION: "0.1.20",
+  //
+  // RELEASE CANDIDATE LABELING (Project Prompt 28): the three numeric
+  // version fields (this constant + both manifests' header/module arrays)
+  // continue the project's existing sequential integer convention,
+  // unbroken, bumped together as always — now 0.1.21. Manifest version
+  // fields are a strict [major, minor, patch] integer array and cannot
+  // carry a suffix; this string constant is free-form (its only consumer
+  // is a single Content Log line, see main.js), so it alone also carries
+  // the "-rc1" Release Candidate label Project Prompt 28 asks for, making
+  // the RC status visible in-game without touching the manifest format.
+  // The .mcaddon filename carries the same "-rc1" suffix for the same
+  // reason. Prompt 28 is explicitly NOT the final release — see
+  // CHANGELOG.md's Project Prompt 28 entry and ROADMAP.md's Phase 28 note.
+  VERSION: "0.1.21-rc1",
 });
 
 /**

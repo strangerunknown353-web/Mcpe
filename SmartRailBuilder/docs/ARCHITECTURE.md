@@ -5701,3 +5701,95 @@ mocked-world testing, exactly as honestly disclosed in every prior session.
   verified — see this session's final report for the exact result.
 - **Not yet confirmed in-game** — see §56.9. This remains a Node.js-only validation pass, like
   every prior session's.
+
+## 57. Release Candidate (Roadmap Phase 28, Project Prompt 28)
+
+### 57.1 — Scope: Confirm Feature-Complete, Version as RC, Do Not Extend
+
+Project Prompt 28 is explicitly the RELEASE CANDIDATE session — feature-complete confirmation
+and packaging, not a feature session, per its own "do NOT add major new features" instruction
+and its priority order (STABILITY > CORRECTNESS > SAFETY > PERFORMANCE > POLISH). This session's
+job was threefold: (1) close the one honestly-disclosed audit-coverage gap from §56.7 — every
+file that a rate-limit-interrupted parallel review pass left un-individually-read; (2) cross-
+check the implementation against all four docs (ARCHITECTURE.md/ROADMAP.md/CHANGELOG.md/
+TODO.md) for discrepancies; (3) version, package, and document the Release Candidate.
+
+### 57.2 — Audit-Coverage Gap Closed: Zero New Bugs
+
+Every file flagged in §56.7 as not individually re-read was read in full this session:
+`inventory/ResourceValidator.js`; `core/BuildRequest.js`, `BuildVector.js`; every pipeline
+stage file not already covered by §56's own reading (`RailDetectionStage.js`,
+`BuildRequestCreationStage.js`, `InventoryStage.js`, `FinalSafetyCheckStage.js`,
+`BuildPlanStage.js`, `CompletionStage.js`); and every `pipeline/*.js` support file
+(`BuildPipeline.js`, `PipelineContext.js`, `PipelineResult.js`, `PipelineOutcome.js`,
+`PipelineStage.js`, `RequestLifecycleState.js`). **Zero new defects found.** Every file
+independently confirms the design claims made about it elsewhere in this document — notably,
+`PipelineOutcome.js`'s `classifyOutcome()` (line ~130) independently confirms §56.2's
+`PlacementStage` fix is correctly wired end to end: a `RAIL_CONFLICT` result is classified
+`VALIDATION_FAILED` (not `PLACEMENT_INCOMPLETE`), which `BuildOrchestrator._reportResult()`
+routes to the `STATUS_CANNOT_BUILD` + reason message pair — exactly the message a player should
+see when zero blocks were placed, with no "construction started" line ever able to precede it
+now that the claim runs first. This closes the audit-coverage gap in full: every one of the 79
+script files under `BP/scripts/` has now been individually, fully read across Project Prompts
+27 and 28 combined, with a total of 3 real, narrow issues found and fixed across both sessions
+(the two from §56.2, plus §55's direction-coverage/§56.4's cancellation-event test gaps, which
+were coverage gaps rather than code defects).
+
+### 57.3 — Documentation Cross-Check: No Discrepancies Found
+
+Compared the current implementation against specific claims in all four docs: version numbers
+(all four fields — BP header/module, RP header/module — confirmed to agree at whatever the
+current release is, checked programmatically each session, unchanged process); the
+`ModeConfigValidator` bound (§56.2's fix, re-confirmed still correct — registry says 1-20,
+validator reads it dynamically, no other doc references the stale "1-64" figure); the rail-
+crossing policy description in §46.5/§48.4 (re-confirmed against the current `RAIL_ITEM_ID_SET`
+consumers, still accurate); `CancellationWatcher`'s 4-event subscription list (§56.4, now fully
+tested, doc and code agree); and the `BUILD_MODE_REGISTRY` bounds (1-16 bridge height, 1-20
+underground depth) referenced across `ARCHITECTURE.md`, `ROADMAP.md`, and `TODO.md` — all
+consistent with `config/BuildModes.js`'s actual values. No discrepancy found between any
+documentation claim and the current implementation.
+
+### 57.4 — Core Feature Freeze (Project Prompt 28's Required List)
+
+Every item on Project Prompt 28's §3 REQUIRED feature list is implemented and covered by the
+regression suite: all 4 rail types; all 4 directions; all 3 modes (Normal/Bridge/Underground);
+Normal's straight/slope/terrain-validation/orientation logic; Bridge's height 1-16, gradual
+ascent/flat/descent, lightweight pier design, material selection, automatic resource
+calculation, and water crossings; Underground's depth 1-20, tunnel clearance, entrance/exit,
+underwater sealing, and lava safety; and every GENERAL item (build configuration, preview via
+`BuildPlan`, pre-build validation, inventory validation, Survival/Creative handling,
+cancellation, multiplayer safety, long-build chunking, existing-rail/structure protection, rail
+intersection handling, and error handling). This is a re-confirmation, not new work — every one
+of these was already implemented by Project Prompt 26 and re-verified sound in Project Prompt
+27; this session adds no new feature to the list.
+
+### 57.5 — Release Candidate Versioning
+
+The three numeric version fields (`Constants.js`'s `ADDON.VERSION` value's numeric prefix, and
+both manifests' header/module version arrays) continue the project's unbroken sequential-
+integer convention — bumped together, as always, to **0.1.21**. Manifest version arrays are a
+strict `[major, minor, patch]` integer triple and cannot carry a suffix, so the "-rc1" Release
+Candidate label Project Prompt 28 asks for lives in the two places that ARE free-form text:
+`ADDON.VERSION` itself (`"0.1.21-rc1"`, surfaced in the one Content Log line that reads it —
+see `main.js`) and the `.mcaddon` filename (`SmartRailBuilder-v0.1.21-rc1.mcaddon`). This is
+explicitly **not** the final release — Project Prompt 30 owns that designation, per this
+session's own instructions.
+
+### 57.6 — Validation Performed
+
+- `node --check` across all 79 script files — 0 failures.
+- **432 assertions across 9 test files, all passing** — unchanged from Project Prompt 27
+  (no production code was modified this session beyond the version bump itself, which changes
+  no logic).
+- Both manifests re-validated: parseable JSON, 4 distinct UUIDs, all 4 version fields agree at
+  0.1.21, dependencies unchanged and still matching actual imports.
+- The `.mcaddon` was rebuilt from the current `BP/`/`RP/` trees and its internal structure
+  verified — see this session's final report for the exact result.
+- **Not yet confirmed in-game** — this remains true for all 28 sessions in this project's
+  history. Every claim above is Node.js-only, mocked-world verification.
+
+### 57.7 — Known Limitations (unchanged, carried forward from §56.9)
+
+No new limitation was discovered this session, and none from §56.9 was resolved (none was
+resolvable without a live client). The ascending `rail_direction` mapping and the rail-crossing
+neighbor-update-tick risk remain the two highest-priority items for your in-game test pass.

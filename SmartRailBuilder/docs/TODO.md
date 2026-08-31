@@ -739,24 +739,46 @@ that works.
       a hand-placed-rail crossing (§56.3/§48.6) is still open and unconfirmable without a
       live client.
 
-## Up Next — Roadmap Phase 28: Release Candidate (not started)
-Per Project Prompt 27's own explicit instruction, Prompt 28 was NOT started this session.
-Its focus, per this session's own findings: (1) your in-game test pass of THIS session's
-`.mcaddon` is the top input, especially the ascending `rail_direction` mapping and the
-rail-crossing neighbor-update-tick risk, since Phase 28 is the natural place to fix either
-if in-game testing shows it wrong; (2) anything your testing surfaces across the 40-item
-checklist delivered this session; (3) the items no session's tests can confirm without a
-live client: neighbor-update side effects on a pre-existing rail (§48.6), the two
-`ui/BuildMenu.js` visual-confirmation items (§50.11), `player.dimension`/`Dimension.id`
-(§51.13), and "ordinary-block player structures can't be detected" (§53.7) — none of them
-touched this session; (4) the one honestly-disclosed audit-coverage gap from this session
-(§56.7) — `inventory/ResourceValidator.js`, several pipeline stage files, `BuildRequest.js`/
-`BuildVector.js`, and the `pipeline/*.js` support files were not individually re-read this
-session beyond what the passing test suite already exercises, and are recommended as the
-first checklist item for a further engineering pass if one is warranted before the release
-candidate is finalized. Per Project Prompt 26's own "do not add these yet" list, curved
-rails/pathfinding/undo/blueprints/stations/custom items/mobs/branding remain out of scope
-through at least Phase 28.
+## Completed — Roadmap Phase 28: Release Candidate ✅
+- [x] **Closed the one honestly-disclosed audit-coverage gap from Prompt 27** —
+      `inventory/ResourceValidator.js`, `core/BuildRequest.js`/`BuildVector.js`, every
+      remaining pipeline stage file, and all 6 `pipeline/*.js` support files, all read in
+      full this session. **Zero new defects found.** §57.2.
+- [x] **Cross-checked implementation against all four docs — no discrepancies found.**
+      Version numbers, the `ModeConfigValidator` bound, the rail-crossing policy,
+      `CancellationWatcher`'s event list, and `BUILD_MODE_REGISTRY`'s bounds all agree
+      between docs and code. §57.3.
+- [x] **Confirmed the full Core Feature Freeze list (Prompt 28 §3)** — every required
+      rail type, direction, mode, and general capability implemented and tested. A
+      re-confirmation, not new work. §57.4.
+- [x] **Versioned as Release Candidate 1** — 0.1.21, with an "-rc1" label in
+      `ADDON.VERSION` and the `.mcaddon` filename (manifest arrays can't carry a
+      suffix). Explicitly not the final release. §57.5.
+- [x] 432 assertions across 9 test files, all passing (unchanged — no production logic
+      modified this session beyond the version bump). `node --check` clean across 79
+      script files.
+- [x] **New Release Candidate `.mcaddon` packaged** — `SmartRailBuilder-v0.1.21-rc1.mcaddon`
+      — structure verified.
+- [ ] **Awaiting your gameplay testing pass** — the TEST A-through-P Minecraft PE plan
+      delivered alongside the `.mcaddon` in this session's final report. Every standing
+      limitation from Prompt 27 is unchanged (§57.7): the ascending `rail_direction`
+      mapping and the rail-crossing neighbor-update-tick risk remain the two
+      highest-priority things to verify visually. Per Project Prompt 28's own rule,
+      Prompt 29 will not begin until this testing is satisfactory.
+
+## Up Next — Roadmap Phase 29: Official Name, Logo & Branding (NOT started)
+Per Project Prompt 28's own explicit instruction, Prompt 29 was NOT started this session, and
+must not begin until your gameplay testing of this session's Release Candidate is
+satisfactory (Project Prompt 28's own rule — "do not move to Prompt 29 until the major
+gameplay tests are satisfactory"). Its scope, per Project Prompt 28's own description, is
+narrow and exclusively visual/presentational: official mod name presentation, logo, branding,
+pack icons, UI branding, and final visual identity — no gameplay logic changes. Its inputs:
+(1) your gameplay test results from this session's Release Candidate — any real bug you find
+takes priority over branding and would need its own fix pass first; (2) the items no session's
+tests can confirm without a live client, listed in §57.7, remain open regardless of branding
+work; (3) the one remaining, deliberately-untouched-until-now piece of scope: this project's
+actual name and visual identity, deliberately reserved since Project Prompt 10 per the
+project's standing rule.
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.

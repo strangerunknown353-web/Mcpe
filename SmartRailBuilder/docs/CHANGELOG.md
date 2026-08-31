@@ -1425,3 +1425,39 @@ consecutive session on a base that has still never been confirmed in-game — se
 - **Not yet confirmed in-game** — this session's own instructions were explicit that
   claiming otherwise without an actual Minecraft launch would be dishonest; none of
   this project's 27 sessions has been play-tested by a human.
+
+### Project Prompt 28 — Release Candidate — 2026-08-31
+
+- **Closed the one honestly-disclosed audit-coverage gap from Project Prompt 27.** Every file
+  a rate-limit-interrupted parallel review pass had left un-individually-read was read in full
+  this session: `inventory/ResourceValidator.js`, `core/BuildRequest.js`, `BuildVector.js`,
+  `pipeline/stages/RailDetectionStage.js`/`BuildRequestCreationStage.js`/`InventoryStage.js`/
+  `FinalSafetyCheckStage.js`/`BuildPlanStage.js`/`CompletionStage.js`, and all 6 `pipeline/*.js`
+  support files. **Zero new defects found.** `PipelineOutcome.js`'s `classifyOutcome()`
+  independently confirmed Project Prompt 27's `PlacementStage` fix is correctly wired end to
+  end. ARCHITECTURE.md §57.2.
+- **Cross-checked the implementation against ARCHITECTURE.md/ROADMAP.md/CHANGELOG.md/TODO.md
+  for discrepancies — none found.** Version numbers, the `ModeConfigValidator` bound, the
+  rail-crossing policy, `CancellationWatcher`'s event list, and `BUILD_MODE_REGISTRY`'s bounds
+  all agree between documentation and implementation. ARCHITECTURE.md §57.3.
+- **Confirmed the full Core Feature Freeze list (Project Prompt 28 §3)** — every required rail
+  type, direction, mode, and general capability is implemented and regression-tested. A
+  re-confirmation, not new work; no feature was added this session. ARCHITECTURE.md §57.4.
+- **Versioned as Release Candidate 1.** The three numeric version fields continue the
+  project's unbroken sequential convention to 0.1.21; the "-rc1" label lives in
+  `ADDON.VERSION`'s free-form string and the `.mcaddon` filename, since manifest version
+  arrays cannot carry a suffix. Explicitly not the final release — Project Prompt 30 owns
+  that. ARCHITECTURE.md §57.5.
+- **Files modified:** `BP/scripts/config/Constants.js` + both manifests (version
+  0.1.20 → 0.1.21, `ADDON.VERSION` also gains the "-rc1" label).
+- **Packaged the Release Candidate `.mcaddon`** — `SmartRailBuilder-v0.1.21-rc1.mcaddon`,
+  structure verified (manifests valid, all 4 version fields agree at 0.1.21, both `.mcpack`
+  archives correctly rooted, `.mcaddon` contains exactly the 2 expected `.mcpack` files).
+- **Validation:** 432 assertions across 9 test files, all passing — unchanged from Project
+  Prompt 27 (no production logic was modified this session beyond the version bump).
+  `node --check` clean across all 79 script files. Full detail in ARCHITECTURE.md §57.6.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of
+  this project's 28 sessions has been play-tested by a human. Per Project Prompt 28's own
+  rule, Project Prompt 29 (branding) will not begin until your gameplay testing of this
+  Release Candidate is satisfactory.

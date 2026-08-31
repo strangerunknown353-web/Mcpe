@@ -1324,12 +1324,42 @@ safety, existing rails and structures, rail intersections, insufficient-resource
 Survival/Creative, cancellation, long/repeated builds, player death/disconnect/dimension
 change, and two-player conflicting construction.
 
-## Remaining Schedule (established by Project Prompt 26, Phase 27 now complete above)
+## Phase 28 Complete: Release Candidate
+Project Prompt 28 was explicitly a confirm-and-package session, not a feature session, per its
+own "do NOT add major new features" instruction. Closed the one honestly-disclosed audit-
+coverage gap flagged at the end of Project Prompt 27: every remaining unread file
+(`inventory/ResourceValidator.js`, `core/BuildRequest.js`/`BuildVector.js`, every remaining
+pipeline stage file, and all 6 `pipeline/*.js` support files) was read in full this session.
+**Zero new defects found** — every file independently confirmed the design claims already made
+about it, including a direct, independent confirmation that Project Prompt 27's `PlacementStage`
+message-ordering fix is correctly wired through `PipelineOutcome.js`'s outcome classification.
+Cross-checked the implementation against all four docs (ARCHITECTURE.md/ROADMAP.md/
+CHANGELOG.md/TODO.md) for discrepancies — none found. Confirmed every item on Project Prompt
+28's REQUIRED core-feature-freeze list (all 4 rail types, all 4 directions, all 3 modes and
+their full boundary/behavior requirements, and every GENERAL requirement) is implemented and
+regression-tested — a re-confirmation, not new work. Versioned as a Release Candidate: the
+three numeric version fields continue the project's unbroken sequential convention to 0.1.21;
+the "-rc1" label (Project Prompt 28's own requirement, since manifest version arrays can't
+carry a suffix) lives in `ADDON.VERSION`'s free-form string and the `.mcaddon` filename. **A
+new, testable Release Candidate `.mcaddon` was packaged and delivered this session** —
+`SmartRailBuilder-v0.1.21-rc1.mcaddon`. 432 assertions across 9 test files, all passing
+(unchanged from Project Prompt 27 — no production logic changed this session, only the version
+bump); `node --check` clean across 79 script files. See ARCHITECTURE.md §57 for the complete
+write-up.
 
-- **Phase 28 — RELEASE CANDIDATE.** The final unbranded gameplay build, tested extensively
-  by you.
+### Phase 28 Manual Testing Checklist
+See this session's final report for the complete TEST A-through-P Minecraft PE test plan
+Project Prompt 28 itself specifies — installation, UI, all rail types, all directions, Normal/
+Bridge/Underground mode (including every height/depth boundary and rejection case), underwater,
+lava safety, resource safety, rail intersections, existing structures, cancellation, long
+builds, multiplayer, and repeated builds.
+
+## Remaining Schedule (established by Project Prompt 26, Phases 27-28 now complete above)
+
 - **Phase 29 — Official name/logo/branding integration.** Nothing visual/branding-related is
-  touched before this phase, per Project Prompt 26's own explicit instruction.
+  touched before this phase, per Project Prompt 26's own explicit instruction. NOT started —
+  awaiting your gameplay testing of this session's Release Candidate first, per Project Prompt
+  28's own "do not move to Prompt 29 until the major gameplay tests are satisfactory" rule.
 - **Phase 30 — Final release polish, documentation, packaging, and final `.mcaddon`.**
 
 ## Phase 27+ Backlog (not scheduled to any specific phase yet)
