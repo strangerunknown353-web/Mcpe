@@ -766,19 +766,41 @@ that works.
       highest-priority things to verify visually. Per Project Prompt 28's own rule,
       Prompt 29 will not begin until this testing is satisfactory.
 
-## Up Next — Roadmap Phase 29: Official Name, Logo & Branding (NOT started)
-Per Project Prompt 28's own explicit instruction, Prompt 29 was NOT started this session, and
-must not begin until your gameplay testing of this session's Release Candidate is
-satisfactory (Project Prompt 28's own rule — "do not move to Prompt 29 until the major
-gameplay tests are satisfactory"). Its scope, per Project Prompt 28's own description, is
-narrow and exclusively visual/presentational: official mod name presentation, logo, branding,
-pack icons, UI branding, and final visual identity — no gameplay logic changes. Its inputs:
-(1) your gameplay test results from this session's Release Candidate — any real bug you find
-takes priority over branding and would need its own fix pass first; (2) the items no session's
-tests can confirm without a live client, listed in §57.7, remain open regardless of branding
-work; (3) the one remaining, deliberately-untouched-until-now piece of scope: this project's
-actual name and visual identity, deliberately reserved since Project Prompt 10 per the
-project's standing rule.
+## Completed — Roadmap Phase 29: Official Branding, Logo & Visual Identity ✅
+- [x] **Name check, not a change** — Prompt 29's own text named "Ryzen Rail Builder";
+      raised the conflict with Prompt 10's deliberate 19-session-old rename directly with
+      you before any work began. **You confirmed "Smart Rail Builder" stays official.**
+      §58.2.
+- [x] **First-ever pack icon and logo added** — `BP/pack_icon.png`/`RP/pack_icon.png`
+      (256×256, procedurally generated rail-track + gear badge, verified legible at
+      32×32), plus a documentation wordmark lockup. No icon existed before this session.
+      §58.3.
+- [x] **UI branding**: 2 of 4 build-menu titles (mode-select, summary) now name the addon,
+      matching the config screen's existing pattern; the other 2 left alone to avoid
+      over-repeating. §58.4.
+- [x] **Message branding**: a short, muted tag added to exactly the 3 build-completion
+      messages, per Prompt 29's own example and its "do not over-prefix" warning. §58.5.
+- [x] **Zero gameplay logic changed** — every edit is a `.lang` value, a new image asset,
+      or the version constant. `node --check` clean across 79 files; 432 assertions across
+      9 test files, all passing, unchanged. §58.9.
+- [x] **New branded `.mcaddon` packaged** — `SmartRailBuilder-v0.1.22-rc2.mcaddon` —
+      structure verified, both `.mcpack` archives now contain their own `pack_icon.png`.
+- [ ] **Awaiting your testing** — the 15-item checklist delivered in this session's final
+      report: pack name/icon visibility on your actual device, and a full regression pass
+      confirming nothing was accidentally broken. Every standing limitation from Prompt 28
+      is unchanged (§58.10); two new, branding-specific items need your visual confirmation:
+      whether the pack icon actually renders, and whether the lengthened form titles fit
+      cleanly on a small mobile screen.
+
+## Up Next — Roadmap Phase 30: Final Release Preparation (NOT started)
+Per Project Prompt 29's own explicit instruction, Prompt 30 was NOT started this session. Per
+Project Prompt 29's own description, it is the FINAL RELEASE phase: final bug review, final
+regression, final documentation, final version, final manifests, final packaging, and the
+final `.mcaddon` — no longer a Release Candidate. Its primary input is your gameplay testing
+of this session's branded build (the 15-item checklist above); any real bug found there needs
+its own fix before Phase 30 can finalize anything. The items no session's tests can confirm
+without a live client (§58.10, carried from §57.7/§56.9) remain open regardless of branding
+work and are Phase 30's own natural last check before declaring the project done.
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.

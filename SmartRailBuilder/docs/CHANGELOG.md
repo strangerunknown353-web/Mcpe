@@ -1461,3 +1461,46 @@ consecutive session on a base that has still never been confirmed in-game — se
   this project's 28 sessions has been play-tested by a human. Per Project Prompt 28's own
   rule, Project Prompt 29 (branding) will not begin until your gameplay testing of this
   Release Candidate is satisfactory.
+
+### Project Prompt 29 — Official Branding, Logo & Visual Identity — 2026-08-31
+
+- **Name check, not a change.** Project Prompt 29's own text named "Ryzen Rail Builder" as
+  official — directly contradicting Project Prompt 10's deliberate rename to "Smart Rail
+  Builder," in place for 19 sessions and matching the repository, folder, and every delivered
+  `.mcaddon`. Raised with you directly before any work began; **you confirmed "Smart Rail
+  Builder" stays official.** No rename occurred. ARCHITECTURE.md §58.2.
+- **Added the project's first pack icon and logo.** `BP/pack_icon.png`/`RP/pack_icon.png`
+  (256×256, procedurally generated — a diagonal rail-track-and-sleepers motif with a small
+  amber gear badge, no third-party material) — there was no pack icon at all before this
+  session, so Bedrock would have shown its generic default in the pack list. Also added a
+  documentation-only wordmark lockup (`docs/assets/logo.png`, `logo-mark.png`).
+  ARCHITECTURE.md §58.3.
+- **Branded 2 of 4 build-menu screen titles** (mode-select and summary — the flow's first and
+  last screens) to name the addon, matching the pattern the configuration screen's title
+  already used since Project Prompt 15. The other 2 screens were deliberately left alone to
+  avoid repeating the name on every screen. ARCHITECTURE.md §58.4.
+- **Added a short, muted branded tag to the 3 build-completion messages** (Normal/Bridge/
+  Underground), per Project Prompt 29's own example format and its explicit "do not prefix
+  every message" instruction — no other message touched. ARCHITECTURE.md §58.5.
+- **Zero gameplay logic changed.** Every change this session is a `.lang` text value, a new
+  binary image asset, or the version constant — confirmed via `node --check` (0 failures
+  across 79 files) and the full 432-assertion suite (unchanged, all passing). No test
+  asserts literal English UI text, so none needed updating. ARCHITECTURE.md §58.9.
+- **Files added:** `BP/pack_icon.png`, `RP/pack_icon.png`, `assets/branding/pack_icon.png`,
+  `docs/assets/logo.png`, `docs/assets/logo-mark.png`.
+- **Files modified:** `RP/texts/en_US.lang` (2 title values + 3 completion-message values),
+  `BP/scripts/config/Constants.js` + both manifests (version 0.1.21 → 0.1.22, `ADDON.VERSION`
+  label "-rc1" → "-rc2").
+- **Packaged the branded `.mcaddon`** — `SmartRailBuilder-v0.1.22-rc2.mcaddon`, structure
+  verified (manifests valid, all 4 version fields agree at 0.1.22, both `.mcpack` archives
+  correctly rooted and now each containing their own `pack_icon.png`, `.mcaddon` contains
+  exactly the 2 expected `.mcpack` files).
+- **Validation:** 432 assertions across 9 test files, all passing — unchanged from Project
+  Prompt 28. `node --check` clean across all 79 script files. Full detail in ARCHITECTURE.md
+  §58.9.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of this
+  project's 29 sessions has been play-tested by a human. Whether the pack icon actually
+  renders correctly and whether the lengthened titles display acceptably on a small screen
+  are both flagged for your testing, not claimed as confirmed. Project Prompt 30 (final
+  release) has NOT been started.

@@ -60,7 +60,14 @@ export const ADDON = Object.freeze({
   // The .mcaddon filename carries the same "-rc1" suffix for the same
   // reason. Prompt 28 is explicitly NOT the final release — see
   // CHANGELOG.md's Project Prompt 28 entry and ROADMAP.md's Phase 28 note.
-  VERSION: "0.1.21-rc1",
+  //
+  // BRANDING PASS (Project Prompt 29): bumped to 0.1.22, "-rc2" — this is
+  // the Release Candidate from Prompt 28 with official branding (pack
+  // icon, logo, UI title branding, branded completion messages) added on
+  // top, no gameplay logic changed. Still explicitly NOT the final
+  // release — Project Prompt 30 owns that designation. See CHANGELOG.md's
+  // Project Prompt 29 entry.
+  VERSION: "0.1.22-rc2",
 });
 
 /**

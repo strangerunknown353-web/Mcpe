@@ -5793,3 +5793,140 @@ session's own instructions.
 No new limitation was discovered this session, and none from §56.9 was resolved (none was
 resolvable without a live client). The ascending `rail_direction` mapping and the rail-crossing
 neighbor-update-tick risk remain the two highest-priority items for your in-game test pass.
+
+## 58. Official Branding, Logo & Visual Identity (Roadmap Phase 29, Project Prompt 29)
+
+### 58.1 — Scope: Presentation Only, No Gameplay Change
+
+Project Prompt 29 is explicitly a branding-only session — "do NOT add new gameplay systems,"
+priority is visual identity, and Prompt 30 is reserved for final release preparation. Nothing
+in `BP/scripts/`'s actual build logic changed this session; every change is either a new binary
+asset (pack icon, logo), a `.lang` text value, or documentation.
+
+### 58.2 — Official Name: Confirmed, Not Changed
+
+Project Prompt 29's own text names "Ryzen Rail Builder" as the official name — but that
+directly contradicts Project Prompt 10's explicit, deliberate rename (documented in
+CHANGELOG.md's Project Prompt 10 entry: "Product renamed from 'Ryzen Rail Builder' to 'Smart
+Rail Builder,' as explicitly requested"), a decision that has held for 19 sessions since,
+including the repository name itself (`smart-rail-builder`), the project folder
+(`SmartRailBuilder/`), every `.mcaddon` filename delivered since, and all four documentation
+files' own titles. Rather than silently reverting 19 sessions of established, deliberate
+naming based on one session's prompt text (which could equally be an unedited template
+carried over from before the Prompt 10 rename), this was raised directly with you before any
+branding work began. **You confirmed "Smart Rail Builder" remains the official name.** No
+rename occurred this session — this section documents that the name was verified, not that it
+changed. See CHANGELOG.md's Project Prompt 10 entry for the original rename's full context,
+including its own disclosed "Ryzen-branded portfolio" flag that this session's naming
+ambiguity independently echoes.
+
+### 58.3 — Logo & Pack Icon
+
+**New visual assets, created this session** (procedurally generated via Pillow — no
+third-party or copyrighted source material):
+- `BP/pack_icon.png` and `RP/pack_icon.png` (256×256 RGBA PNG, identical) — the actual
+  in-game branding surface: Bedrock auto-detects `pack_icon.png` at each pack's root with no
+  manifest reference needed, shown in the pack list where a player enables/manages packs.
+  Design: a dark slate-to-navy gradient background, a diagonal two-rail track with wooden
+  sleepers (steel/silver rails, warm brown ties) as the primary railway motif, plus a small
+  amber gear badge in the upper-left conveying "engineering/automation" — kept deliberately
+  simple (no fine detail, no text) so it stays legible at the small sizes a pack-list icon is
+  actually shown at; verified by rendering it down to 48×48 and 32×32 before finalizing.
+- `docs/assets/logo-mark.png` (512×512, rounded-corner variant of the same badge) and
+  `docs/assets/logo.png` (1200×400 wordmark lockup: the badge beside a two-line "SMART RAIL
+  BUILDER" wordmark and a subtitle) — documentation/promotional assets, not consumed by
+  Bedrock and not packaged into either `.mcpack` (see 58.7). `assets/branding/pack_icon.png`
+  is the source file the two in-pack copies were made from, kept for future edits.
+- No pre-Prompt-29 logo or pack icon existed anywhere in the repository — Bedrock would have
+  shown its generic default icon for both packs in the pack list until this session.
+
+### 58.4 — UI Branding
+
+Two of the build menu's four form titles now identify the addon by name, matching the pattern
+already established (since Project Prompt 15) by the third — `promptForConfiguration()`'s
+title has always been the bare pack name:
+- `menu.modeTitle` ("Select Building Mode" → "Smart Rail Builder — Building Mode") — the
+  first screen a player sees.
+- `menu.summaryTitle` ("Build Summary" → "Smart Rail Builder — Build Summary") — the last
+  screen before construction begins.
+- `menu.materialTitle` (Bridge-only material screen) and the configuration screen's own
+  existing bare "Smart Rail Builder" title were left unchanged — by the third/fourth screen
+  in one flow, the brand has already been shown twice; repeating it on every single screen
+  would be the same "annoying over-prefixing" Project Prompt 29 §6 explicitly warns against,
+  applied to titles instead of chat messages. `menu.modeBody`'s existing "Choose how Smart
+  Rail Builder should build your railway" text (present since Project Prompt 15, unchanged)
+  already reinforces the name in the first screen's body too.
+- These are pure `.lang` value edits — `ui/BuildMenu.js`'s code reads the same
+  `LocalizationKeys.MENU_MODE_TITLE`/`MENU_SUMMARY_TITLE` translate keys as before, unchanged.
+  Zero logic touched; confirmed via the unmodified `LocalizationKeys`↔`en_US.lang` cross-check
+  (0 missing, 0 orphaned beyond the expected `pack.name`/`pack.description` pair) and the full
+  432-assertion suite, unaffected.
+
+### 58.5 — Branding in Game Messages
+
+Per Project Prompt 29 §6's explicit example format and its explicit warning against
+over-prefixing: a short, muted `§7[Smart Rail Builder]§r` tag (gray, resetting to the
+existing green success color before the message text) was added to exactly the 3
+build-completion messages — `construction.complete` (Normal), `bridge.constructionComplete`,
+`underground.constructionComplete` — the single most significant, positive, and infrequent
+message category, and the exact category Project Prompt 29's own example ("Build complete!")
+names. No other message (progress pings, the 3 "construction started" messages, any
+validation/rejection message) was touched — those remain exactly as they were, per the
+explicit "do not prefix every single message" instruction.
+
+### 58.6 — Visual Consistency Review
+
+Reviewed titles, buttons, labels, and messages across `ui/BuildMenu.js` and
+`RP/texts/en_US.lang` for a consistent identity: the name now appears at pack-list level
+(icon), at the start and end of the build-configuration flow (58.4), and at the moment of
+success (58.5) — three consistent, non-overlapping touchpoints rather than one saturating
+change. No other UI element (buttons, mode labels, validation messages) was altered — Project
+Prompt 29 §4's "must not interfere with usability" and "keep Mode selection/Rail
+selection/.../Cancel easy to understand" holds structurally, since no functional text or
+control changed, only the two title strings and the three completion-message prefixes.
+
+### 58.7 — Asset & Package Validation
+
+- Both `pack_icon.png` files confirmed 256×256, RGBA, valid PNG (`Pillow` round-trip check).
+- `assets/branding/` and `docs/assets/` (the source files and the documentation-only logo
+  lockup) are outside both `BP/`and `RP/` — the packaging step only zips those two directories'
+  own contents, so these never end up inside either `.mcpack`, confirmed by inspecting the
+  packaged archive's file listing (93 files in `BP.mcpack`, unchanged from Project Prompt
+  28 aside from the one new `pack_icon.png`; 4 files in `RP.mcpack`, one new `pack_icon.png`
+  added to the previous 3).
+- `LocalizationKeys.js`↔`en_US.lang` cross-check re-run: 0 missing, 0 unexpected orphans
+  (same 2 expected pack-level exceptions as every prior session).
+- No manifest reference needed for `pack_icon.png` — confirmed against the stable Bedrock
+  manifest format (file-presence-based auto-detection at each pack's root, not a manifest
+  field), so neither manifest required a schema change for the new asset, only their normal
+  version bump (58.8).
+
+### 58.8 — Versioning
+
+Continues the project's unbroken sequential integer convention: 0.1.21 → **0.1.22**, all
+4 manifest fields plus `Constants.js`'s `ADDON.VERSION` bumped together as always. The
+"-rc2" label (this is the Prompt 28 Release Candidate, now branded — still a candidate, not
+final) lives in `ADDON.VERSION`'s free-form string and the `.mcaddon` filename, the same
+mechanism established in §57.5 for "-rc1," since manifest version arrays still cannot carry a
+suffix. Explicitly not the final release — Project Prompt 30 owns that.
+
+### 58.9 — Gameplay Regression Check
+
+Per Project Prompt 29 §9/§10's explicit requirement to verify branding didn't break anything:
+`node --check` across all 79 script files (0 failures — no script file's logic was touched,
+only two `.lang` string values and the version constant's string), and the full 432-assertion
+suite (all passing, unchanged) — confirming Normal/Bridge/Underground mode, rail detection,
+inventory handling, validation, and multiplayer state are all untouched by this session's
+purely presentational changes. No test needed updating, since no test asserts the literal
+English text of a title or completion message (confirmed by grep before editing either) —
+tests assert `localizationKey` identifiers and substitution values only, which none of this
+session's edits changed.
+
+### 58.10 — Known Limitations (unchanged, carried forward from §57.7)
+
+No new limitation was discovered or resolved this session. Two additional, PE-client-only
+items are worth a first look during your gameplay test of this branded build, though neither
+is expected to be an issue: whether `pack_icon.png` actually renders in the pack-management
+UI on your device (a purely visual confirmation no Node harness can perform), and whether the
+lengthened form titles (58.4) display acceptably on a small-screen mobile client without
+truncation — flagged for your testing, not claimed as confirmed.

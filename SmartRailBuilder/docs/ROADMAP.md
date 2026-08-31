@@ -1354,13 +1354,45 @@ Bridge/Underground mode (including every height/depth boundary and rejection cas
 lava safety, resource safety, rail intersections, existing structures, cancellation, long
 builds, multiplayer, and repeated builds.
 
-## Remaining Schedule (established by Project Prompt 26, Phases 27-28 now complete above)
+## Phase 29 Complete: Official Branding, Logo & Visual Identity
+Branding-only session, per Project Prompt 29's own "do NOT add new gameplay systems"
+instruction — nothing in `BP/scripts/`'s build logic changed. **Note on process:** Project
+Prompt 28 asked that Prompt 29 wait for satisfactory gameplay testing of the Release
+Candidate first; you gave Prompt 29 directly, without that confirmation being explicitly
+stated. Proceeded as instructed (you're the one running this project, and Prompt 29's own
+text is an explicit, direct instruction to continue) — noted here for an honest record, not
+as a objection. **Name check, not a change:** Project Prompt 29's own text names "Ryzen Rail
+Builder" as official, directly contradicting Project Prompt 10's deliberate, 19-session-old
+rename to "Smart Rail Builder" (documented in CHANGELOG.md's Project Prompt 10 entry,
+matching the repository/folder name and every delivered `.mcaddon` since). Raised with you
+directly before any branding work began — **you confirmed "Smart Rail Builder" stays the
+official name.** No rename occurred. **New visual assets** (procedurally generated, no
+third-party material): `BP/pack_icon.png`/`RP/pack_icon.png` (256×256, a rail-track + gear
+badge, verified legible down to 32×32) — the actual in-game pack-list branding surface, which
+had no icon at all before this session — plus a documentation-only wordmark logo
+(`docs/assets/logo.png`/`logo-mark.png`). **UI branding**: 2 of 4 build-menu screen titles
+now name the addon (mode-select and summary — the flow's first and last screens), matching
+the pattern the configuration screen's title already used since Project Prompt 15; the other
+2 screens were left alone to avoid over-repeating the name. **Message branding**: a short,
+muted `[Smart Rail Builder]` tag added to exactly the 3 build-completion messages, per
+Project Prompt 29's own example and its explicit warning against over-prefixing — no other
+message touched. All changes are `.lang` text values, two binary image assets, and the
+version constant — zero script logic modified. **432 assertions across 9 test files, all
+passing, unchanged** — no test asserts literal English UI text, so none needed updating.
+`node --check` clean across 79 script files. **A new, testable branded `.mcaddon` was
+packaged and delivered this session** — version 0.1.22-rc2. See ARCHITECTURE.md §58 for the
+complete write-up.
 
-- **Phase 29 — Official name/logo/branding integration.** Nothing visual/branding-related is
-  touched before this phase, per Project Prompt 26's own explicit instruction. NOT started —
-  awaiting your gameplay testing of this session's Release Candidate first, per Project Prompt
-  28's own "do not move to Prompt 29 until the major gameplay tests are satisfactory" rule.
-- **Phase 30 — Final release polish, documentation, packaging, and final `.mcaddon`.**
+### Phase 29 Manual Testing Checklist
+See this session's final report for the 15-item practical checklist Project Prompt 29 itself
+specifies — install, pack name/icon visibility, UI branding, and a full regression pass
+across all three modes, rail types, resource handling, and multiplayer, confirming nothing
+was accidentally broken by the branding changes.
+
+## Remaining Schedule (established by Project Prompt 26, Phases 27-29 now complete above)
+
+- **Phase 30 — Final release polish, documentation, packaging, and final `.mcaddon`.** NOT
+  started — awaiting your gameplay testing of this session's branded build first.
 
 ## Phase 27+ Backlog (not scheduled to any specific phase yet)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is
