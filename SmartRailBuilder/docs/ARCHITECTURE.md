@@ -4871,3 +4871,187 @@ same reason, rather than silently picking one without saying so.
   across any of its now-22 sessions. This session's own instructions were explicit that
   claiming otherwise would be dishonest; every "Validation Performed" section in this document,
   across every prior session, has said the same thing for the same reason.
+
+## 52. Performance, Stability & Long-Build Optimization (Roadmap Phase 23, Project Prompt 23)
+
+### 52.1 — Scope: Audit First, Fix What's Real, Don't Manufacture Work
+
+This session's brief was an audit — find genuine inefficiencies and fix them, not add
+speculative optimization for its own sake. The full pipeline (event listener → UI →
+BuildConfiguration → BuildPlan → TerrainScanner → PathValidator → InventoryManager →
+RailBuilder → resource transaction → MessageService) was traced end to end against every
+item in §1-§13's checklist. Most of it was already sound, built up deliberately across 22
+prior sessions specifically BECAUSE performance/watchdog-safety was a recurring, explicit
+concern (`system.runJob` generator pacing since Project Prompt 10, throttled progress since
+Project Prompt 9, "never cache inventory reads" since Project Prompt 8). Two real,
+fixable inefficiencies were found and fixed; everything else confirmed sound is documented
+below as CONFIRMED, not silently skipped.
+
+### 52.2 — Real Fix: `InventoryManager.hasAtLeast()` Replaces Four Full-Container Scans
+
+Every per-block placement loop (`StraightRailStrategy`, `BridgeExecutionStrategy` — both its
+rail loop and its shared `_placeMaterial()` support/surface loop, `UndergroundExecutionStrategy`)
+re-checked "do I still have at least one of this item" via `countRailItems()`, which — via
+`_scanSlots()` — always iterates every slot of the container and sums the total, even after
+the answer (yes/no against a threshold of 1) is already certain. This live re-check is
+genuinely necessary (§2/§8's own "never sacrifice transaction safety" — it must stay a real,
+uncached read, since a player could exhaust their supply mid-build), but summing the WHOLE
+container for a plain threshold question was wasted iteration in the common case. `hasAtLeast(player,
+typeId, minimumAmount)` (new) answers the identical live question with an early exit the
+moment the threshold is met — same live-read guarantee, less iteration, same answer as
+`countRailItems() >= N` in every case (proven directly, `tests/performanceStability.test.mjs`
+§52.9). All 4 call sites updated; `countRailItems()`/`buildReport()` are unchanged and still
+the right call wherever the EXACT total is needed (`InventoryStage`, `BuildPlanStage`,
+deduction accounting).
+
+### 52.3 — Real Addition: Practical Performance Metrics, One Line Per Completed Build
+
+Project Prompt 23 §21 asked for practical metrics (blocks processed, planning/construction
+duration) without permanent heavy debug logging. `PipelineContext` gained one field
+(`createdAt`, set at construction — the trigger-to-menu-close instant); `CompletionStage`'s
+existing single `Logger.info` completion line (unchanged since Project Prompt 10) was extended
+to also report `planningMs` (menu + validation + terrain + inventory, ending when
+`PlacementStage` constructs the `BuildSession`), `constructionMs` (the multi-tick placement
+itself), and — when `context.buildPlan` is present (Project Prompt 22) —
+`requiredRails`/`requiredMaterial`/`modifiedPositions`. Still exactly one log line per
+completed build, at the existing `INFO` level — silenced the same way any other `INFO` line
+already is, by raising `Constants.LOGGING.MIN_LEVEL` (still flagged in TODO.md as worth
+raising before a real release, unchanged from prior sessions).
+
+### 52.4 — Confirmed Sound, Not Rewritten: `system.runJob` / Generator Pacing (§2)
+
+Every long operation already yields at a sensible granularity: `StraightRailStrategy` and
+`UndergroundExecutionStrategy` yield once per rail position (excavation for that position
+happens inline, before the yield, not as separate yields per excavated block);
+`BridgeExecutionStrategy` yields once per PLACED block (support, surface, or rail) — each of
+which is itself capped by the plan's own already-minimal position lists (§52.6). Given this
+project's own configured ceiling (`LENGTH_PRESETS.MAX_SURVIVAL = 64`), the worst realistic
+case is a handful hundred yields (measured directly, §52.9: 161 for a height-16, length-40
+bridge), nowhere near a volume that would need coarser batching to avoid "painfully slow," nor
+fine enough to reduce watchdog safety. No yield granularity was changed — the existing design
+was already the right balance.
+
+### 52.5 — Confirmed Sound, Not Rewritten: Terrain Caching, Block-Write Minimization (§7/§10)
+
+- **Terrain caching inside BuildPlan**: already true, done in Project Prompt 22 —
+  `BuildPlan.terrainInfo` carries each mode's terrain summary, assembled from data already
+  computed, never a new scan. `TerrainScanningStage`'s original scan and
+  `FinalSafetyCheckStage`'s one deliberate re-scan immediately before placement remain the only
+  two real scans per build — both already justified at length in prior sessions' own
+  headers (two different moments in time, not duplicated work) and re-confirmed correct here,
+  not re-litigated.
+- **"Do not write a block that doesn't need it"**: already true, by construction, for the
+  cases that matter. `TunnelExcavator.excavateRow()` already skips a position outright when
+  `block.isAir` — the single most common real case (an excavation position that was already a
+  natural air pocket). Bridge/Underground fill positions (`supportPositions`/
+  `surfacePositions`/seal positions) are pre-filtered at PLANNING time to only include
+  positions that actually needed material in the first place (see `BridgePlan`/
+  `UndergroundPlan`'s own docs: a column with solid ground already at deck level gets no
+  entry at all) — so there is no meaningful "already the correct block" case left to guard at
+  placement time beyond what planning already excluded. Existing-rail preservation
+  (`RAIL_ITEM_ID_SET`, unchanged since Project Prompt 19) is the one placement-time "don't
+  write" case, and it was already correct.
+
+### 52.6 — Confirmed Sound: BuildPlan Memory (§9)
+
+Measured directly against this project's real ceiling (length 64, Bridge height 16, Underground
+depth 20 — §52.9): the largest `modificationBoundary` observed was 161 positions (a
+height-16, length-40 bridge). At a few small fields per position (`{x,y,z}` plus whichever
+list it came from), this is trivially small for a scripting environment — nowhere near a scale
+where a more compact representation (bitpacking, run-length encoding, etc.) would be worth the
+real cost §9 itself warns against: "do not optimize prematurely if it makes the architecture
+significantly harder to maintain." No change made; the existing plain-array/`Set` shape stays.
+
+### 52.7 — Confirmed Sound: API / Script Review (§20)
+
+Re-confirmed (not re-audited from scratch — this exact check has been run in multiple prior
+sessions with the same result): every `@minecraft/server`/`@minecraft/server-ui` import across
+the whole script tree resolves to one of the two intended modules; `Block.isSolid` remains
+deliberately unused (§34's own lesson); the one fire-and-forget async call
+(`orchestrator.startBuild(...)` in `main.js`'s event listener) has always carried a `.catch()`;
+no `.then()`-style unchained promise exists anywhere in the codebase; no unbounded
+(`while(true)`/`for(;;)`) loop exists anywhere — every search loop (tunnel search, terrain
+scan) is bounded by an explicit config ceiling.
+
+### 52.8 — New Test Coverage: Cancellation, Job Lifecycle, Max Length, Multiplayer Load
+
+`tests/performanceStability.test.mjs` (44 new assertions) closes a real, previously-unproven
+gap: prior sessions tested `CancellationWatcher`'s own flag-setting, but never that a
+strategy's GENERATOR actually stops promptly and leaves the correct partial state once
+cancelled — and never for BRIDGE/UNDERGROUND specifically, only NORMAL. This session drives
+each of the three strategies' generators directly, cancels mid-loop, and confirms: the very
+next iteration returns immediately, no further block is placed, and the reported `BuildResult`
+is honest (`completed: false`, correct partial `blocksPlaced`, correct `stopReason`). Also
+covers: a player starting a fresh build (same area, even) immediately after a previous one
+completes or is cancelled, with no stale `ActiveBuildRegistry` claim or `CancellationWatcher`
+registration blocking it; the project's real 64-length ceiling (respected, not raised, per
+this session's own instruction) actually succeeding for all three modes; and 3 simultaneous
+players across 3 modes in 3 far-apart areas with no cross-player leakage.
+
+**A real bug in this test file's own first draft was found and fixed before being trusted** —
+worth naming, per this project's standing practice: its `fakeBuildRequest()` helper didn't
+forward `buildingMode`, so a BRIDGE-mode test's `bridgeMaterialId` was silently discarded by
+`BuildRequest`'s own mode-gating (that field is only kept when `buildingMode === "BRIDGE"`,
+unchanged since the bugfix pass before Project Prompt 18) — the test was unknowingly exercising
+`BridgeConfig.FALLBACK_MATERIAL_ID` instead of the material it claimed to be testing. The two
+happen to be the same block ("minecraft:cobblestone"), which is exactly why the test still
+"passed" at first despite testing the wrong thing. Caught only once a later assertion actually
+checked which material ended up on the session; fixed by forwarding `buildingMode` properly.
+
+### 52.9 — Performance Results (Node-harness measurements, honestly labeled — not real Minecraft tick timing)
+
+A one-off measurement script (not part of the committed suite — see this session's final
+report) ran every combination Project Prompt 23 §3-§5 asked for, at this project's real
+ceiling (length 64; heights/depths up to their own real maximums of 16/20), through the real
+`TerrainScanningStage → InventoryStage → FinalSafetyCheckStage → BuildPlanStage → PlacementStage`
+sequence:
+
+| Build | Blocks placed | Scan | Inventory | Final re-scan | Plan assembly | Placement |
+|---|---|---|---|---|---|---|
+| NORMAL, length 64 (max) | 64 | 0.36ms | 0.03ms | 0.12ms | 0.04ms | 0.26ms |
+| BRIDGE, height 16, length 40 | 161 | 0.24ms | 0.04ms | 0.10ms | 0.14ms | 0.49ms |
+| UNDERGROUND, depth 20, length 64 (max both) | 64 rails / 150 positions total | 0.30ms | 0.03ms | 0.10ms | 0.09ms | 1.44ms |
+
+Every stage's timing stays flat (not growing quadratically) as build size grows across the
+whole tested range, confirming no accidental O(n²) pattern was introduced or already present.
+`FinalSafetyCheckStage`'s re-scan and `BuildPlanStage`'s re-validation (Project Prompt 22) —
+the two stages doing deliberately "repeated" work on purpose — both cost a fraction of a
+millisecond even at the maximum build size, empirically confirming the "not wasteful
+duplication" argument from their own headers, not just asserting it. These numbers are Node
+mock-harness timings (no real block-update propagation, no real network sync, no real tick
+scheduling) — they demonstrate the absence of algorithmic blowup, not real Minecraft
+performance, which only an actual client/server can measure.
+
+### 52.10 — Known Limitations (disclosed, not hidden, carried forward from prior sessions)
+
+- **Every limitation from §51.13 remains**: `player.dimension`/`Dimension.id` is still new,
+  unconfirmed API surface; the two `ui/BuildMenu.js` visual-confirmation items and
+  neighbor-update side effects on a pre-existing rail remain unconfirmable without a live
+  client.
+- **This project's configured maximum build length is 64** (`LENGTH_PRESETS.MAX_SURVIVAL`) —
+  Project Prompt 23 asked to test up to 500 blocks "if the current configured maximum is
+  lower, respect that maximum... do NOT increase the maximum just for this test." 100/250/500
+  block builds are consequently not reachable through the actual UI and were not claimed as
+  tested; the heaviest cases actually reachable (length 64, height 16, depth 20) were tested
+  instead, per that same instruction.
+- **No in-game verification for anything in this or any prior session.** Every claim above is a
+  Node-only, mocked-world verification — see §52.11 and the Minecraft PE test checklist
+  delivered alongside this session's `.mcaddon`.
+
+### 52.11 — Validation Performed
+
+- `node --check` across all 79 script files — 0 failures.
+- **319 assertions across 7 test files, all passing**: 55 (`water.test.mjs`, unchanged), 68
+  (`terrain.test.mjs`, unchanged), 39 (`execution.test.mjs`, unchanged), 29
+  (`integration.test.mjs`, unchanged), 25 (`uiMenu.test.mjs`, unchanged), 59
+  (`buildPlanSafety.test.mjs`, unchanged), and 44 new (`performanceStability.test.mjs`).
+- `LocalizationKeys`↔`RP/texts/en_US.lang` cross-check: 0 missing, 0 orphaned keys (no new
+  player-facing strings were added this session — every change was internal).
+- The addon's `.mcaddon` was rebuilt and its internal structure verified (manifests parse as
+  valid JSON, all three version fields agree at 0.1.16, both `.mcpack` archives contain a
+  `manifest.json` at their own root, the outer `.mcaddon` contains exactly the two `.mcpack`
+  files) — see the delivered file and this session's final report for the exact result.
+- **Not yet confirmed in-game** — nothing in this project has been play-tested by a human
+  across any of its now-23 sessions. This session's own instructions were explicit that
+  claiming otherwise would be dishonest; every "Validation Performed" section in this document,
+  across every prior session, has said the same thing for the same reason.

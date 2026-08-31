@@ -22,6 +22,10 @@ import { Logger } from "../utils/Logger.js";
  *     every inventory slot (`countRailItems`).
  *   - Produce a complete InventoryReport for a required quantity
  *     (`buildReport`) — the primary interface future stages/tests use.
+ *   - Answer "does this player have at least N of this item" without
+ *     necessarily scanning every slot (`hasAtLeast`, Project Prompt 23) —
+ *     the cheap, still-live check every per-block placement loop's
+ *     "do I still have enough for THIS block" re-check actually needs.
  *   - Remove exactly N matching items from inventory, only when explicitly
  *     asked (`deductRailItems`) — never as a side effect of reading.
  *   - List the player's currently-held placeable blocks (`scanPlaceableMaterials`,
@@ -30,11 +34,14 @@ import { Logger } from "../utils/Logger.js";
  *     "is this a placeable block" determination.
  *
  * WHY READS ARE NEVER CACHED (Project Prompt 8's SECURITY requirement)
- *   Every call to `buildReport`/`countRailItems` re-reads the live
- *   container. Nothing is cached across calls, because inventory can change
- *   at any time — while a menu is open, between pipeline stages, or between
- *   ticks during a multi-tick build. See ARCHITECTURE.md §23.5/§29 ("Known
- *   API Risks") for the full reasoning.
+ *   Every call to `buildReport`/`countRailItems`/`hasAtLeast` re-reads the
+ *   live container. Nothing is cached across calls, because inventory can
+ *   change at any time — while a menu is open, between pipeline stages, or
+ *   between ticks during a multi-tick build. See ARCHITECTURE.md §23.5/§29
+ *   ("Known API Risks") for the full reasoning. `hasAtLeast` (Project Prompt
+ *   23) still reads live every call — it only changes HOW MUCH of the
+ *   container it reads (early exit once the threshold is certain), never
+ *   WHETHER it reads live, so this guarantee is unchanged, not weakened.
  *
  * DEPENDENCIES
  *   - utils/Logger.js
@@ -75,6 +82,43 @@ export class InventoryManager {
    */
   countRailItems(player, railTypeId) {
     return this._scanSlots(player, railTypeId).totalAvailable;
+  }
+
+  /**
+   * Added Project Prompt 23 (performance pass). Every per-block placement
+   * loop (StraightRailStrategy, BridgeExecutionStrategy,
+   * UndergroundExecutionStrategy) re-checks "do I still have at least one
+   * of this item" before every single block — a genuine, necessary live
+   * safety re-check (see those files' own "WHY EVERY BLOCK IS RE-VERIFIED"
+   * docs), not something to cache or skip. But every one of those call sites
+   * only ever needed a yes/no threshold answer, not the exact total — and
+   * `countRailItems()` (via `_scanSlots()`) always sums across EVERY slot in
+   * the container regardless, even after the answer is already certain.
+   * This method answers the exact same live question with an early exit the
+   * moment the threshold is met, typically well before the container's last
+   * slot — same live-read guarantee (never cached, never stale), less
+   * iteration in the common case. `countRailItems()`/`buildReport()` are
+   * unchanged and still the right calls wherever the exact total is actually
+   * needed (InventoryStage, BuildPlanStage, deduction accounting).
+   * @param {import("@minecraft/server").Player} player
+   * @param {string} typeId
+   * @param {number} minimumAmount
+   * @returns {boolean}
+   */
+  hasAtLeast(player, typeId, minimumAmount) {
+    const inventory = player.getComponent("minecraft:inventory");
+    const container = inventory?.container;
+    if (!container) return false;
+
+    let total = 0;
+    for (let slot = 0; slot < container.size; slot++) {
+      const item = container.getItem(slot);
+      if (item && item.typeId === typeId) {
+        total += item.amount;
+        if (total >= minimumAmount) return true;
+      }
+    }
+    return false;
   }
 
   /**

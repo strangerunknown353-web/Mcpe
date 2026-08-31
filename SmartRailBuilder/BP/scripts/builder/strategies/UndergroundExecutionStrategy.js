@@ -189,7 +189,7 @@ export class UndergroundExecutionStrategy {
       }
 
       const isSurvival = player.getGameMode() !== GameMode.Creative;
-      if (isSurvival && this._inventoryManager.countRailItems(player, railTypeId) < 1) {
+      if (isSurvival && !this._inventoryManager.hasAtLeast(player, railTypeId, 1)) {
         Logger.warn(`Underground build stopped for ${player.name} at step ${i}: ran out of ${railTypeId}.`);
         return this._result(session, "OUT_OF_RESOURCES");
       }

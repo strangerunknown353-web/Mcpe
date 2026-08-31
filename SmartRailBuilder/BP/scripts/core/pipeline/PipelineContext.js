@@ -39,6 +39,15 @@ export class PipelineContext {
     this.player = player;
     /** @readonly */
     this.railTypeId = railTypeId;
+    /**
+     * @readonly
+     * Added Project Prompt 23 (performance pass §21): timestamp this
+     * pipeline run began — the "trigger" end of "planning duration."
+     * CompletionStage uses this alongside `BuildSession.startedAt` to log a
+     * practical planning-vs-construction duration split, without adding any
+     * new per-block logging.
+     */
+    this.createdAt = Date.now();
 
     /**
      * Written only by BuildPipeline.run() as the request progresses — see

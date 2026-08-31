@@ -1197,3 +1197,51 @@ consecutive session on a base that has still never been confirmed in-game — se
 - **Not yet confirmed in-game** — this session's own instructions were explicit that
   claiming otherwise without an actual Minecraft launch would be dishonest; none of
   this project's 22 sessions has been play-tested by a human.
+
+### Project Prompt 23 — Performance, Stability & Long-Build Optimization — 2026-08-31
+
+- **Added: `InventoryManager.hasAtLeast(player, typeId, minimumAmount)`** — replaces four
+  full-container inventory scans (one per per-block "do I still have enough" re-check across
+  `StraightRailStrategy`, `BridgeExecutionStrategy` (rails and material), and
+  `UndergroundExecutionStrategy`) with an early-exit threshold check. Same live, uncached read
+  guarantee as before — never sacrifices transaction safety — just less iteration in the
+  common case. ARCHITECTURE.md §52.2.
+- **Added: practical performance metrics** to `CompletionStage`'s existing single completion
+  log line — planning duration, construction duration, required rails/material, and positions
+  modified, via one new `PipelineContext.createdAt` field. Still exactly one `INFO` line per
+  completed build, silenced the same way any other log line already is. ARCHITECTURE.md §52.3.
+- **Confirmed sound, not rewritten**: `system.runJob` generator pacing, terrain caching inside
+  `BuildPlan` (already done, Project Prompt 22), block-write minimization (already correct by
+  construction — excavation already skips already-clear blocks; bridge/underground fill
+  positions are pre-filtered at planning time), `BuildPlan`'s memory footprint (measured at a
+  maximum of 161 positions for the heaviest realistic build), and the project's API surface
+  (no deprecated calls, no unhandled promises, no unbounded loops). ARCHITECTURE.md §52.4-§52.7.
+- **Added: `tests/performanceStability.test.mjs`** (44 new assertions) — proves mid-construction
+  cancellation actually stops a strategy's generator promptly with the correct partial state,
+  for ALL THREE modes (previously only proven for `CancellationWatcher`'s own flag-setting);
+  job lifecycle (a fresh build starts cleanly immediately after a previous one completes or is
+  cancelled); the project's real 64-length ceiling succeeding for all three modes (respected,
+  not raised, per this session's own instruction); and a 3-player simultaneous load test. A
+  real bug in this test file's own first draft (a helper silently discarding `bridgeMaterialId`
+  because it didn't forward `buildingMode`) was found and fixed before being trusted.
+  ARCHITECTURE.md §52.8.
+- **Performance measured directly** (Node-harness timing, explicitly not real Minecraft tick
+  timing): every pipeline stage's cost stays flat as build size grows across the whole tested
+  range (length up to 64, height up to 16, depth up to 20) — no algorithmic blowup found or
+  introduced. ARCHITECTURE.md §52.9.
+- **Files created:** `tests/performanceStability.test.mjs`.
+- **Files modified:** `BP/scripts/inventory/InventoryManager.js` (new `hasAtLeast()`),
+  `BP/scripts/builder/strategies/StraightRailStrategy.js` +
+  `BP/scripts/builder/strategies/BridgeExecutionStrategy.js` +
+  `BP/scripts/builder/strategies/UndergroundExecutionStrategy.js` (all 4 call sites switched
+  to `hasAtLeast()`), `BP/scripts/core/pipeline/PipelineContext.js` (new `createdAt` field),
+  `BP/scripts/core/pipeline/stages/CompletionStage.js` (metrics logging), `tests/README.md`,
+  `config/Constants.js` + both manifests (version 0.1.15 → 0.1.16).
+- **Packaged a new, testable `.mcaddon`** — version 0.1.16, structure verified (manifests
+  valid, all three version references agree, both `.mcpack` archives correctly rooted,
+  `.mcaddon` contains exactly the 2 expected `.mcpack` files).
+- **Validation:** 319 assertions across 7 test files (275 unchanged + 44 new), all passing.
+  `node --check` clean across all 79 script files. Full detail in ARCHITECTURE.md §52.11.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of
+  this project's 23 sessions has been play-tested by a human.

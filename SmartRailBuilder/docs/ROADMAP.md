@@ -1152,7 +1152,43 @@ every boundary/invalid case (height/depth 0 and out-of-range, insufficient rails
 an underwater tunnel, build cancellation, a long build, Survival vs. Creative, and a
 two-player test including an inventory change before final confirmation.
 
-## Phase 23+ — Reserved for Future Features (planned only when reached)
+## Phase 23 — Performance, Stability & Long-Build Optimization (Project Prompt 23) — COMPLETE (awaiting in-game confirmation)
+
+Status: an audit pass across the entire pipeline (event listener → UI → BuildConfiguration →
+BuildPlan → TerrainScanner → PathValidator → InventoryManager → RailBuilder → resource
+transaction → MessageService), fixing what was genuinely inefficient and confirming — not
+silently skipping — what was already sound. Two real fixes: `InventoryManager.hasAtLeast()`
+replaces four full-container inventory scans (one per per-block placement loop across all
+three modes) with an early-exit threshold check, keeping the same live, uncached read
+guarantee while reducing iteration in the common case; and a practical performance-metrics
+line (planning/construction duration, required rails/material, positions modified) added to
+`CompletionStage`'s existing single completion log line — no new per-block logging. Confirmed
+sound, not rewritten: `system.runJob` generator pacing (already yields at a sensible
+granularity for this project's real 64-length ceiling), terrain caching inside `BuildPlan`
+(done in Project Prompt 22), block-write minimization (already correct by construction —
+excavation skips already-clear blocks, bridge/underground fill positions are pre-filtered at
+planning time), `BuildPlan`'s memory footprint (measured at a maximum of 161 positions for the
+heaviest realistic build — trivially small), and the API surface (no deprecated calls, no
+unhandled promises, no unbounded loops). New test coverage closes a real, previously-unproven
+gap: mid-construction cancellation was only ever tested via `CancellationWatcher`'s own
+flag-setting, never that a strategy's GENERATOR actually stops promptly with the correct
+partial state — now proven directly for all three modes, plus job lifecycle (a fresh build
+starts cleanly right after a previous one completes or is cancelled) and a 3-player
+simultaneous load test. See ARCHITECTURE.md §52 for the complete write-up, including real
+Node-harness performance measurements (explicitly labeled as such, not real Minecraft tick
+timing) and a test-authoring mistake this session's own tests caught and fixed before being
+trusted. **A new, testable `.mcaddon` was packaged and delivered this session** — version
+0.1.16. 319 assertions across 7 test files, all passing; `node --check` clean across 79
+script files.
+
+### Phase 23 Manual Testing Checklist
+See this session's final report (delivered alongside the `.mcaddon`) for the complete,
+numbered 22-item Minecraft PE testing checklist covering build lengths, all three modes at
+their real boundary values, an underwater railway, rail intersections, Survival/Creative
+resource behavior, cancellation, disconnect, death, two-player simultaneous builds, and
+repeated builds (including immediately after a cancelled one).
+
+## Phase 24+ — Reserved for Future Features (planned only when reached)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is
 currently dark and will spawn mobs; worth a deliberate decision) · cave-floor filling for
 Underground Mode (BridgeSupportBuilder is the natural reuse) · curved rails · undo
@@ -1164,8 +1200,10 @@ of these is a registry entry, not a rewrite) · sealing Underground's best-effor
 buffer against water too (currently just omitted when unsafe, see ARCHITECTURE.md
 §47.10) · a wider (not just lateral) waterproof shell for large aquifer pockets, if
 in-game testing shows the current thin seal is ever insufficient · an actual undo/rollback
-mechanism built on top of this session's new world modification boundary (§51.4), now that
-every build's exact touched-position set is a real, inspectable value.
+mechanism built on top of Project Prompt 22's world modification boundary (§51.4), now that
+every build's exact touched-position set is a real, inspectable value · raising
+`LENGTH_PRESETS.MAX_SURVIVAL` past 64, if in-game testing of this session's performance work
+shows headroom for it (a deliberate decision, not a default to change casually).
 
 Each of these gets the same treatment as Phases 2–15: design discussion first, one
 milestone at a time, your testing before moving on.

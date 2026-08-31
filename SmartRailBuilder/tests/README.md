@@ -17,6 +17,7 @@ node tests/execution.test.mjs
 node tests/integration.test.mjs
 node tests/uiMenu.test.mjs
 node tests/buildPlanSafety.test.mjs
+node tests/performanceStability.test.mjs
 ```
 
 No dependencies, no build step — plain Node (22+), ESM (`.mjs`).
@@ -194,6 +195,34 @@ mock player before calling the new stage under test:
 `node_modules/@minecraft/server-ui/`'s mock (Project Prompt 21) needed no
 changes for this session's work — BuildPlanStage/BuildPlan/ActiveBuildRegistry
 have no UI surface of their own.
+
+`performanceStability.test.mjs` (Project Prompt 23) — performance/stability
+specifics no prior suite exercised:
+- `InventoryManager.hasAtLeast()` (new this session) correctness against
+  `countRailItems()`, including split-stack inventories.
+- Mid-construction cancellation for ALL THREE execution strategies, not just
+  Normal Mode — proves the generator stops on the very next check after
+  `session.markCancelled()`, places nothing further, and reports the correct
+  partial state.
+- Job lifecycle: the same player can start a fresh build (same area, even)
+  immediately after a previous one COMPLETES, and separately immediately
+  after a previous one is CANCELLED — no stale `ActiveBuildRegistry` claim
+  or `CancellationWatcher` registration blocks the next one.
+- The project's own configured maximum build length (64) actually succeeds
+  for all three modes — respected, not raised, per this session's own
+  instruction not to increase it just to test higher.
+- 3 simultaneous players, 3 different modes, 3 far-apart areas — no
+  configuration/inventory/progress/build-plan leakage.
+- A real bug in this test file's OWN first draft was found and fixed before
+  being trusted: `fakeBuildRequest()` didn't forward `buildingMode`, so a
+  BRIDGE-mode test's `bridgeMaterialId` was silently discarded by
+  `BuildRequest`'s own mode-gating (`bridgeMaterialId` is only kept when
+  `buildingMode === "BRIDGE"`) and the test was unknowingly exercising the
+  fallback material instead of the one it claimed to be testing — the two
+  happened to be the same block, which is exactly why the test still
+  "passed" at first. Fixed by passing `buildingMode` through; kept here
+  since it's exactly the kind of test-authoring mistake worth naming, not
+  smoothing over.
 
 ## What's NOT covered (known gaps, not solved this session)
 

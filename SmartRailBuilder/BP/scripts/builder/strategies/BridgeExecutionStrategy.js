@@ -187,7 +187,7 @@ export class BridgeExecutionStrategy {
       }
 
       const isSurvival = player.getGameMode() !== GameMode.Creative;
-      if (isSurvival && this._inventoryManager.countRailItems(player, session.railTypeId) < 1) {
+      if (isSurvival && !this._inventoryManager.hasAtLeast(player, session.railTypeId, 1)) {
         Logger.warn(`Bridge build stopped for ${player.name}: ran out of ${session.railTypeId}.`);
         return this._result(session, "OUT_OF_RESOURCES");
       }
@@ -240,7 +240,7 @@ export class BridgeExecutionStrategy {
     }
 
     const isSurvival = player.getGameMode() !== GameMode.Creative;
-    if (isSurvival && this._inventoryManager.countRailItems(player, materialId) < 1) {
+    if (isSurvival && !this._inventoryManager.hasAtLeast(player, materialId, 1)) {
       Logger.warn(`Bridge build stopped for ${player.name}: ran out of ${materialId}.`);
       return "OUT_OF_BRIDGE_MATERIAL";
     }

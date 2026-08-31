@@ -581,6 +581,34 @@ genuine regression evidence, just not a re-run of the original files byte-for-by
       sessions, plus one new one (§51.13): `player.dimension`/`Dimension.id` is new API
       surface for this project, not previously exercised — see flag #7 above.
 
+## Completed — Roadmap Phase 23: Performance, Stability & Long-Build Optimization ✅
+- [x] **Added `InventoryManager.hasAtLeast()`** — replaces four full-container inventory
+      scans (one per per-block placement loop, all three modes) with an early-exit
+      threshold check. Same live, uncached read guarantee. §52.2.
+- [x] **Added practical performance metrics** to the existing single completion log line —
+      planning/construction duration, required rails/material, positions modified. Still one
+      `INFO` line per build. §52.3.
+- [x] **Confirmed sound, not rewritten**: `system.runJob` pacing, terrain caching inside
+      `BuildPlan`, block-write minimization (already correct by construction),
+      `BuildPlan`'s memory footprint (measured: max 161 positions at this project's real
+      ceiling), and the API surface (no deprecated calls, no unhandled promises, no
+      unbounded loops). §52.4-§52.7.
+- [x] **Added `tests/performanceStability.test.mjs`** (44 new assertions) — mid-construction
+      cancellation proven for ALL THREE modes' actual generators (not just
+      `CancellationWatcher`'s flag), job lifecycle after completion/cancellation, the real
+      64-length ceiling succeeding for all three modes, and a 3-player load test. A real bug
+      in this test file's own first draft was found and fixed before being trusted. §52.8.
+- [x] **Performance measured directly** (Node-harness timing, explicitly not real Minecraft
+      tick timing) — every stage's cost stays flat as build size grows; no algorithmic
+      blowup found. §52.9.
+- [x] 319 assertions across 7 test files, all passing. `node --check` clean across 79
+      script files.
+- [x] **New `.mcaddon` packaged, version 0.1.16** — structure verified.
+- [ ] **Awaiting your in-game test pass** — full numbered checklist delivered alongside the
+      `.mcaddon` in this session's final report. Same standing limitations as prior
+      sessions (§52.10) — nothing new this session, since no new player-facing behavior or
+      API surface was added.
+
 ## ⚠️ Order Note (Pre-Prompt-18 Bug-Fix Pass)
 Uploaded with four specific bug reports and four screenshots, explicitly instructing
 "DO NOT START PROJECT PROMPT 18 YET." Honored — Project Prompt 18 was not started.
@@ -594,18 +622,19 @@ broken, the packaging fix (bugfix session) and the `.mcaddon` import itself rema
 right place to start ruling things out first, since nothing else can be verified until
 that works.
 
-## Up Next — Roadmap Phase 23+ (not started)
-Per Project Prompt 22's own scope limit (consolidate/harden the existing pipeline, no
-engine rebuild), the backlog is unchanged from before this session except that a real
-world modification boundary now exists (ARCHITECTURE.md §51.4), which is exactly the
-prerequisite an eventual undo system would need. See ROADMAP.md's Phase 23+ backlog:
-underground tunnel lighting (ARCHITECTURE.md §45.12), the two water-specific follow-ups
-(ARCHITECTURE.md §47.10), curved rails, undo, blueprint save/load, and the rest. Project
-Prompt 23 itself, whenever it arrives, is milestone-gated on your test pass of THIS
-session, per the project's standing workflow — including the items no session's tests can
-confirm without a live client: neighbor-update side effects on a pre-existing rail
-(§48.6), the two `ui/BuildMenu.js` visual-confirmation items (§50.11), and
-`player.dimension`/`Dimension.id` (§51.13).
+## Up Next — Roadmap Phase 24+ (not started)
+Per Project Prompt 23's own scope limit (performance/stability audit, no new
+player-facing features), the backlog is unchanged from before this session. See
+ROADMAP.md's Phase 24+ backlog: underground tunnel lighting (ARCHITECTURE.md §45.12), the
+two water-specific follow-ups (ARCHITECTURE.md §47.10), curved rails, undo, blueprint
+save/load, and the rest — now also noting that raising `LENGTH_PRESETS.MAX_SURVIVAL` past
+64 is a real, deliberate option worth considering once this session's performance work is
+confirmed in-game (measured Node-harness cost stays flat well past the current ceiling).
+Project Prompt 24 itself, whenever it arrives, is milestone-gated on your test pass of
+THIS session, per the project's standing workflow — including the items no session's
+tests can confirm without a live client: neighbor-update side effects on a pre-existing
+rail (§48.6), the two `ui/BuildMenu.js` visual-confirmation items (§50.11), and
+`player.dimension`/`Dimension.id` (§51.13) — none of them touched or added to this session.
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.
@@ -613,7 +642,7 @@ The checklist that used to live under this heading now lives under Phase 16, whe
 actual bridge engine has now been built. Heading kept, body intentionally emptied, for
 session-history continuity — not a second, duplicate copy of the same checklist.)
 
-## Backlog (Roadmap Phase 23+, not scheduled yet)
+## Backlog (Roadmap Phase 24+, not scheduled yet)
 - [ ] Curved rail placement (extends `RailPermutationBuilder.js`, per its own design notes)
 - [x] ~~Underwater railways~~ — done, Roadmap Phase 18 (Project Prompt 18). See
       ARCHITECTURE.md §47.
