@@ -1332,3 +1332,40 @@ consecutive session on a base that has still never been confirmed in-game — se
 - **Not yet confirmed in-game** — this session's own instructions were explicit that
   claiming otherwise without an actual Minecraft launch would be dishonest; none of
   this project's 25 sessions has been play-tested by a human.
+
+### Project Prompt 26 — Final Feature Integration & Advanced Railway Behavior — 2026-08-31
+
+- **Established the remaining project schedule**, per Project Prompt 26's own explicit
+  reframing: Prompt 27 (bug-fixing/compatibility/multiplayer/optimization pass), Prompt 28
+  (release candidate), Prompt 29 (branding), Prompt 30 (final polish/packaging).
+- **Found and closed a real, significant test-coverage gap: direction coverage.** Auditing
+  every existing test file found that, across over 300 assertions spanning every prior
+  session, essentially every terrain/bridge/underground test travels EAST exclusively — NORTH
+  appears once, SOUTH and WEST never appear outside a single bare permutation lookup. This
+  mattered specifically because `RailPermutationBuilder.js`'s own header flags the ascending
+  `rail_direction` mapping as "the session's highest-risk assumption" in the project, and
+  three of its four values had never been exercised by any test. ARCHITECTURE.md §55.2.
+- **Added: `tests/directionCoverage.test.mjs`** (64 new assertions) — the ascending
+  `rail_direction` mapping, flat-terrain scanning, one-block rises, Bridge Mode, and
+  Underground Mode all re-verified for NORTH/SOUTH/EAST/WEST, computing expected coordinates
+  from `DirectionUtils` itself rather than hardcoded numbers. All 64 assertions passed against
+  the real, unmodified production code — a coverage gap, not a functional bug.
+- **Confirmed sound, not rewritten** (reviewed against the full checklist, only real findings
+  acted on): railway continuity/rail type consistency, start/end position handling, slope
+  quality, bridge/underground transitions and structure, underwater railway, rail
+  intersections, existing structures, resource transactions, interruption handling,
+  multiplayer, conflict protection, UI, configuration validation, performance, and error
+  messages. ARCHITECTURE.md §55.3.
+- **Files created:** `tests/directionCoverage.test.mjs`.
+- **Files modified:** `tests/README.md`, `docs/TODO.md` (item #7 updated to reflect the new
+  internal-consistency proof), `config/Constants.js` + both manifests (version
+  0.1.18 → 0.1.19).
+- **Packaged a new, testable `.mcaddon`** — version 0.1.19, structure verified (manifests
+  valid, all three version references agree, both `.mcpack` archives correctly rooted,
+  `.mcaddon` contains exactly the 2 expected `.mcpack` files).
+- **Validation:** 420 assertions across 9 test files (356 unchanged + 64 new), all passing.
+  `node --check` clean across all 79 script files (no production code changed this session).
+  Full detail in ARCHITECTURE.md §55.5.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of
+  this project's 26 sessions has been play-tested by a human.

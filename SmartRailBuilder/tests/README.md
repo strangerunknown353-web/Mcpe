@@ -19,6 +19,7 @@ node tests/uiMenu.test.mjs
 node tests/buildPlanSafety.test.mjs
 node tests/performanceStability.test.mjs
 node tests/structureProtection.test.mjs
+node tests/directionCoverage.test.mjs
 ```
 
 No dependencies, no build step — plain Node (22+), ESM (`.mjs`).
@@ -256,6 +257,20 @@ each mode independently, since each mode's routing code reads
 never offered as bridge material. `terrain.test.mjs` also gained two new
 transition tests this session ("Depression → Flat" and a descending
 staircase) — see that file directly, not a new suite.
+
+`directionCoverage.test.mjs` (Project Prompt 26) — closes a real, previously-
+unnoticed gap: essentially every test in this project (over 300 assertions,
+across every prior session) only ever traveled EAST. NORTH appeared exactly
+once (a bare permutation lookup); SOUTH and WEST never appeared outside
+`RailPermutationBuilder`'s own straight-rail direction test. This suite
+re-runs the same already-proven scenarios (flat terrain, one-block rise,
+Bridge, Underground) for all four cardinal directions, computing expected
+coordinates from `DirectionUtils` itself rather than hardcoding numbers that
+could share the same mistake — and closes the specific gap
+`RailPermutationBuilder.js`'s own header calls "the session's highest-risk
+assumption": the ascending `rail_direction` mapping (2=east, 3=west,
+4=north, 5=south) had only ever been checked for `north`; this suite checks
+all four. All 64 assertions passed against the real, unmodified code.
 
 ## What's NOT covered (known gaps, not solved this session)
 

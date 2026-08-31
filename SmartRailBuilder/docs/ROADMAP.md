@@ -1257,7 +1257,47 @@ values, all four rail types, an underwater tunnel, lava safety, an existing rail
 resource behavior, cancellation, a long build, two-player simultaneous construction, and
 repeated builds.
 
-## Phase 26+ — Reserved for Future Features (planned only when reached)
+## Phase 26 — Final Feature Integration & Advanced Railway Behavior (Project Prompt 26) — COMPLETE (awaiting in-game confirmation)
+
+Status: a feature-completeness confirmation pass, explicitly not a feature-adding one —
+Project Prompt 26 itself named what NOT to add yet (curved rails, arbitrary pathfinding, undo,
+blueprints, stations, custom items/mobs, branding) and reframed the remaining schedule (see
+Phase 27-30 below). Reviewing the full requirement checklist found no new bugs — mirroring
+Project Prompt 25's own finding one session earlier — but surfaced one real, significant,
+previously-unnoticed gap: **direction coverage**. Auditing every existing test file found that,
+across over 300 assertions spanning every prior session, essentially every terrain/bridge/
+underground test travels EAST exclusively — NORTH appears once, SOUTH and WEST never appear
+outside a single bare permutation lookup. This mattered specifically because
+`RailPermutationBuilder.js`'s own header flags the ascending `rail_direction` mapping as "the
+session's highest-risk assumption" in the whole project, and three of its four values had
+never been exercised by any test. `tests/directionCoverage.test.mjs` (new, 64 assertions)
+closes this: the ascending rail_direction mapping, flat-terrain scanning, one-block rises,
+Bridge Mode, and Underground Mode are all re-verified for NORTH/SOUTH/EAST/WEST, computing
+expected coordinates from `DirectionUtils` itself rather than hardcoded numbers. All 64
+assertions passed against the real, unmodified production code — this was a coverage gap, not
+a functional bug: every direction was already correct, it had simply never been proven before.
+See ARCHITECTURE.md §55 for the complete write-up, including confirmation (with the exact
+mechanism, not silently skipped) for every other requirement in the checklist. **A new,
+testable `.mcaddon` was packaged and delivered this session** — version 0.1.19. 420 assertions
+across 9 test files, all passing; `node --check` clean across 79 script files.
+
+### Phase 26 Manual Testing Checklist
+See this session's final report (delivered alongside the `.mcaddon`) for the complete,
+numbered 30-item Minecraft PE testing checklist covering all four directions, all four rail
+types, all three modes at their boundary values, an underwater tunnel, lava safety, existing
+railways/structures, resource behavior, cancellation, a long build, two-player construction,
+and repeated builds.
+
+## Remaining Schedule (established by Project Prompt 26)
+
+- **Phase 27 — Full bug-fixing, compatibility, multiplayer, and optimization pass.**
+- **Phase 28 — RELEASE CANDIDATE.** The final unbranded gameplay build, tested extensively
+  by you.
+- **Phase 29 — Official name/logo/branding integration.** Nothing visual/branding-related is
+  touched before this phase, per Project Prompt 26's own explicit instruction.
+- **Phase 30 — Final release polish, documentation, packaging, and final `.mcaddon`.**
+
+## Phase 27+ Backlog (not scheduled to any specific phase yet)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is
 currently dark and will spawn mobs; worth a deliberate decision) · cave-floor filling for
 Underground Mode (BridgeSupportBuilder is the natural reuse) · curved rails · undo
@@ -1274,7 +1314,10 @@ every build's exact touched-position set is a real, inspectable value · raising
 `LENGTH_PRESETS.MAX_SURVIVAL` past 64, if in-game testing of Project Prompt 23's performance
 work shows headroom for it (a deliberate decision, not a default to change casually) ·
 expanding `PROTECTED_STRUCTURE_BLOCK_IDS` (Project Prompt 24) if in-game testing surfaces a
-common player-placed block type this session's list missed.
+common player-placed block type this session's list missed. Per Project Prompt 26's own
+"do not add these yet" list, none of curved rails/pathfinding/undo/blueprints/stations/custom
+items/custom mobs/branding are in scope before Phase 29 (branding) or a future session that
+explicitly revisits this backlog.
 
 Each of these gets the same treatment as Phases 2–15: design discussion first, one
 milestone at a time, your testing before moving on.

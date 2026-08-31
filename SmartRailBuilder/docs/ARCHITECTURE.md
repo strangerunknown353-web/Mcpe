@@ -5350,3 +5350,130 @@ anywhere in the ramp/crest/descent geometry.
   across any of its now-25 sessions. This session's own instructions were explicit that
   claiming otherwise would be dishonest; every "Validation Performed" section in this document,
   across every prior session, has said the same thing for the same reason.
+
+## 55. Final Feature Integration & Advanced Railway Behavior (Roadmap Phase 26, Project Prompt 26)
+
+### 55.1 — Scope: Feature-Complete Confirmation, Not New Features
+
+Project Prompt 26 explicitly reframed the remaining schedule (Prompt 27: bug-fixing/
+compatibility/optimization pass; Prompt 28: release candidate; Prompt 29: branding; Prompt 30:
+final packaging) and explicitly listed what NOT to add this session (curved rails, arbitrary
+pathfinding, undo, blueprints, stations, custom items/mobs, branding). This session's job was
+confirming the core system is genuinely feature-complete for a stabilization pass to follow —
+not building anything new. Reviewing the full §1-§23 checklist found no new bugs (mirroring
+Project Prompt 25's own finding) but surfaced one real, significant, previously-unnoticed gap:
+**direction coverage**.
+
+### 55.2 — Real Gap Found and Closed: Direction Coverage
+
+Auditing every existing test file found that, across over 300 assertions spanning every prior
+session, essentially every terrain/bridge/underground test travels EAST exclusively. NORTH
+appears exactly once (a single bare `rail_direction` lookup); SOUTH and WEST never appear
+anywhere outside `RailPermutationBuilder`'s own straight-rail (non-ascending) direction test.
+This is exactly the blind spot Project Prompt 26 §3 asks about directly: "Verify all four
+horizontal directions... The builder must not reverse the railway unexpectedly" — and it
+matters more than it might first appear, because `RailPermutationBuilder.js`'s own header
+already flags the ascending `rail_direction` mapping (2=east, 3=west, 4=north, 5=south) as
+"the session's highest-risk assumption" in the whole project — and three of those four values
+had never been exercised by any test, unit or otherwise.
+
+`tests/directionCoverage.test.mjs` (new, 64 assertions) closes this: `buildAscendingRailPermutation`
+is now checked against the documented mapping for all four directions (previously only
+`north`); `TerrainScanner.scanPath()` (flat terrain and a one-block rise), `planBridge()`, and
+`planUnderground()` are each re-run for NORTH/SOUTH/EAST/WEST with the SAME parameters already
+proven correct for EAST, computing expected end coordinates from `DirectionUtils.toStepVector()`
+itself (never hardcoded, so a shared mistake in both the test and the code couldn't silently
+agree) — including that every Underground ramp step's `slopeDirection` is genuinely the
+opposite of travel (per `rampSlopeDirection()`'s own documented rule) in all four directions,
+and that both Bridge endpoints still anchor to real ground regardless of travel axis. **All 64
+assertions passed against the real, unmodified production code** — this was a coverage gap,
+not a functional bug: NORTH/SOUTH/WEST were already correct, they had simply never been proven
+before this session.
+
+**What this does and does not confirm**: it proves the addon's own direction handling is
+internally CONSISTENT across all four directions (the same geometry, the same rail_direction
+mapping, the same slope logic, regardless of which way the player is facing). It does NOT
+confirm the ascending `rail_direction` mapping is correct against real Bedrock — that remains
+exactly as unconfirmed as it was (see TODO.md item #7, `ARCHITECTURE.md` §36.3) — only that
+the mapping now agrees with itself across every direction rather than three of them being
+untested.
+
+### 55.3 — Confirmed Sound, Not Rewritten: Everything Else (§1-§2, §4-§23)
+
+Every other numbered requirement was reviewed against the real code and found already correct,
+matching Project Prompt 25's own findings one session prior — nothing here had changed in the
+interim, so nothing needed re-fixing:
+
+- **Railway continuity, rail type consistency (§1/§2)**: `RAIL_ITEM_ID_SET` preservation and
+  the single-source-of-truth `railTypeId` threaded through `BuildRequest`/`BuildSession`/every
+  strategy remain unchanged since Project Prompt 19/25 — re-confirmed via the full regression
+  suite (including Project Prompt 25's own golden-rail full-pipeline proof, still passing).
+- **Start/end position handling (§4/§5)**: `BuildVector`'s ORIGIN RULE (one block ahead of the
+  player, never the player's own block — a structural guarantee, not a runtime check) is
+  unchanged since Roadmap Phase 4; both bridge endpoints' real-ground anchoring and the
+  Underground exit's landing buffer were directly proven in Project Prompt 25 (§54.2/§54.3),
+  now also proven across all four directions (§55.2).
+- **Slope quality, bridge/underground transitions (§6/§7/§10/§11)**: every listed terrain
+  combination (rise, drop, consecutive slopes/drops, rise→flat, flat→rise, drop→flat) was
+  already tested by Project Prompt 24's own new tests (§53.3) plus the pre-existing suite;
+  tunnel safety (water/lava/unbreakable rejected BEFORE excavation) unchanged since Project
+  Prompt 12/18.
+- **Bridge structure/supports (§8/§9)**: lightweight piers at `BridgeConfig.PIER_SPACING`,
+  unchanged since the bugfix pass before Project Prompt 18, re-confirmed via the full suite
+  including this session's new per-direction pier checks.
+- **Underwater railway (§12)**: shallow water tolerated, deep water rejected, waterproofing
+  scoped to only what a tunnel actually intersects — unchanged since Project Prompt 18.
+- **Rail intersections, existing structures (§13/§14)**: re-tested via the full regression
+  suite (unchanged); `PROTECTED_STRUCTURE_BLOCK_IDS` (Project Prompt 24) still protects
+  chests/doors/etc. — the "ordinary-block structures can't be detected" limitation is
+  unchanged and still honestly disclosed.
+- **Resource transactions, interruption, multiplayer, conflict protection (§15-§18)**:
+  deduction strictly after placement, partial-build policy, `ActiveBuildRegistry` conflict
+  rejection — all unchanged since Project Prompt 22/23, re-verified via
+  `buildPlanSafety.test.mjs`/`performanceStability.test.mjs` (both unchanged, still passing).
+- **UI, configuration validation (§19/§20)**: Project Prompt 21's screens already show
+  Rail/Mode/Length/Height-Depth/Material/Required Resources/Validation Status with consistent
+  terminology; `ModeConfigValidator` already enforces bounds server-side regardless of what the
+  UI permits — no visual/branding changes made or needed, per this session's own explicit
+  "NAME AND LOGO ARE RESERVED FOR PROMPT 29" instruction.
+- **Performance (§21)**: nothing performance-relevant changed this session; Project Prompt
+  23's own direct measurements (§52.9) still apply unchanged.
+- **Error messages (§22)**: every example message the prompt lists ("Not enough rails,"
+  "Not enough bridge material," "The selected height is invalid," etc.) already exists,
+  worded plainly, established across Project Prompts 15-22 — re-read against the current
+  `.lang` file, no stale or misleading text found beyond what Project Prompt 24 already fixed.
+
+### 55.4 — Known Limitations (disclosed, not hidden, carried forward from prior sessions)
+
+- Every limitation from §54.7 remains unchanged: a player structure built from ORDINARY
+  blocks still can't be distinguished from natural terrain; `player.dimension`/`Dimension.id`
+  is still unconfirmed API surface; the two `ui/BuildMenu.js` visual-confirmation items and
+  neighbor-update side effects on a pre-existing rail remain unconfirmable without a live
+  client; the build-length ceiling is still 64.
+- **The ascending `rail_direction` mapping is now internally consistent across all four
+  directions, but still not confirmed against real Bedrock** (§55.2) — this is the single
+  highest-priority item for your in-game test pass, and for Prompt 27's own stabilization
+  focus if it surfaces as wrong.
+- **No in-game verification for anything in this or any prior session.** Every claim above is
+  a Node-only, mocked-world verification — see §55.5 and the Minecraft PE test checklist
+  delivered alongside this session's `.mcaddon`.
+
+### 55.5 — Validation Performed
+
+- `node --check` across all 79 script files — 0 failures (no production code changed this
+  session; only a new test file was added).
+- **420 assertions across 9 test files, all passing**: 55 (`water.test.mjs`, unchanged), 39
+  (`execution.test.mjs`, unchanged), 37 (`integration.test.mjs`, unchanged), 44
+  (`performanceStability.test.mjs`, unchanged), 14 (`structureProtection.test.mjs`,
+  unchanged), 83 (`terrain.test.mjs`, unchanged), 25 (`uiMenu.test.mjs`, unchanged), 59
+  (`buildPlanSafety.test.mjs`, unchanged), and 64 new (`directionCoverage.test.mjs`).
+- `LocalizationKeys`↔`RP/texts/en_US.lang` cross-check: 0 missing, 0 orphaned keys (no
+  player-facing strings changed this session).
+- The addon's `.mcaddon` was rebuilt and its internal structure verified (manifests parse as
+  valid JSON, all three version fields agree at 0.1.19, both `.mcpack` archives contain a
+  `manifest.json` at their own root, the outer `.mcaddon` contains exactly the two `.mcpack`
+  files) — see the delivered file and this session's final report for the exact result.
+- **Not yet confirmed in-game** — nothing in this project has been play-tested by a human
+  across any of its now-26 sessions. This session's own instructions were explicit that
+  claiming otherwise would be dishonest; every "Validation Performed" section in this
+  document, across every prior session, has said the same thing for the same reason.

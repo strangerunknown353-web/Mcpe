@@ -101,7 +101,13 @@
 6. **Logging verbosity before release** — `Constants.LOGGING.MIN_LEVEL` defaults to
    `"DEBUG"`. Fine for testing; raise to `"INFO"`/`"WARN"` before any release build.
 7. **`rail_direction`/`rail_data_bit` state names** — the single highest-risk unconfirmed
-   assumption in the project so far. Please verify visually.
+   assumption in the project so far. Please verify visually. Project Prompt 26 closed the
+   one remaining gap in this assumption's OWN internal consistency (the ascending
+   `rail_direction` mapping — 2=east, 3=west, 4=north, 5=south — had only ever been
+   unit-tested for `north`; all four are now tested and agree with each other), but this
+   does NOT confirm the mapping is correct against real Bedrock — only that the addon is
+   now internally consistent across all four directions. Still needs your visual
+   confirmation.
 8. **`.mcaddon` packaging structure — FIXED**, bugfix session between Prompts 15/16.
    You reported "not a valid archive" — root cause and fix in ARCHITECTURE.md §43.
    **Please confirm the rebuilt `.mcaddon` actually imports** before anything else gets
@@ -662,6 +668,31 @@ genuine regression evidence, just not a re-run of the original files byte-for-by
       `.mcaddon` in this session's final report. Every standing limitation from prior
       sessions (§54.7) is unchanged — nothing new added this session.
 
+## Completed — Roadmap Phase 26: Final Feature Integration & Advanced Railway Behavior ✅
+- [x] **Remaining project schedule established** — Prompt 27 (bug-fixing/compatibility/
+      multiplayer/optimization), Prompt 28 (release candidate), Prompt 29 (branding),
+      Prompt 30 (final polish/packaging).
+- [x] **Found and closed a real, significant test-coverage gap: direction coverage.**
+      Over 300 assertions across every prior session traveled EAST exclusively; the
+      ascending `rail_direction` mapping's 3 untested values (west/east/south — only north
+      was ever checked) are now all verified. §55.2.
+- [x] **Added `tests/directionCoverage.test.mjs`** (64 new assertions) — all three modes,
+      all four directions, all passing against the real, unmodified code. A coverage gap,
+      not a functional bug.
+- [x] **Confirmed sound, not rewritten**: railway continuity, rail type consistency,
+      start/end position handling, slope quality, bridge/underground transitions and
+      structure, underwater railway, rail intersections, existing structures, resource
+      transactions, interruption handling, multiplayer, conflict protection, UI,
+      configuration validation, performance, error messages. §55.3.
+- [x] 420 assertions across 9 test files, all passing. `node --check` clean across 79
+      script files (no production code changed this session).
+- [x] **New `.mcaddon` packaged, version 0.1.19** — structure verified.
+- [ ] **Awaiting your in-game test pass** — full numbered checklist delivered alongside the
+      `.mcaddon` in this session's final report. Every standing limitation from prior
+      sessions (§55.4) is unchanged. The ascending `rail_direction` mapping is now
+      internally consistent across all four directions but STILL not confirmed against
+      real Bedrock (flag #7 above) — the single highest-priority thing to verify visually.
+
 ## ⚠️ Order Note (Pre-Prompt-18 Bug-Fix Pass)
 Uploaded with four specific bug reports and four screenshots, explicitly instructing
 "DO NOT START PROJECT PROMPT 18 YET." Honored — Project Prompt 18 was not started.
@@ -675,18 +706,18 @@ broken, the packaging fix (bugfix session) and the `.mcaddon` import itself rema
 right place to start ruling things out first, since nothing else can be verified until
 that works.
 
-## Up Next — Roadmap Phase 26+ (not started)
-Per Project Prompt 25's own scope limit (construction-quality audit, no unrelated features),
-the backlog is entirely unchanged from before this session — no new code, no new limitations.
-See ROADMAP.md's Phase 26+ backlog: underground tunnel lighting (ARCHITECTURE.md §45.12), the
-two water-specific follow-ups (ARCHITECTURE.md §47.10), curved rails, undo, blueprint
-save/load, raising `LENGTH_PRESETS.MAX_SURVIVAL` past 64, and the rest. Project Prompt 26
-itself, whenever it arrives, is milestone-gated on your test pass of THIS session, per the
-project's standing workflow — including the items no session's tests can confirm without a
-live client: neighbor-update side effects on a pre-existing rail (§48.6), the two
-`ui/BuildMenu.js` visual-confirmation items (§50.11), `player.dimension`/`Dimension.id`
-(§51.13), and "ordinary-block player structures can't be detected" (§53.7) — none of them
-touched this session.
+## Up Next — Roadmap Phase 27: Full Bug-Fixing, Compatibility, Multiplayer & Optimization Pass (not started)
+Per Project Prompt 26's own newly-established schedule, Phase 27 is a dedicated stabilization
+pass — not a feature session. Its focus, per this session's own findings: (1) your in-game
+test pass of THIS session's `.mcaddon` is the top input, especially the ascending
+`rail_direction` mapping (flag #7) since Phase 27 is the natural place to fix it if it turns
+out wrong; (2) anything your testing surfaces across the 30-item checklist delivered this
+session; (3) the items no session's tests can confirm without a live client: neighbor-update
+side effects on a pre-existing rail (§48.6), the two `ui/BuildMenu.js` visual-confirmation
+items (§50.11), `player.dimension`/`Dimension.id` (§51.13), and "ordinary-block player
+structures can't be detected" (§53.7) — none of them touched this session. Per Project Prompt
+26's own "do not add these yet" list, curved rails/pathfinding/undo/blueprints/stations/custom
+items/mobs/branding remain out of scope through at least Phase 28 (release candidate).
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.
@@ -694,7 +725,7 @@ The checklist that used to live under this heading now lives under Phase 16, whe
 actual bridge engine has now been built. Heading kept, body intentionally emptied, for
 session-history continuity — not a second, duplicate copy of the same checklist.)
 
-## Backlog (Roadmap Phase 26+, not scheduled yet)
+## Backlog (Roadmap Phase 27+, not scheduled yet)
 - [ ] Curved rail placement (extends `RailPermutationBuilder.js`, per its own design notes)
 - [x] ~~Underwater railways~~ — done, Roadmap Phase 18 (Project Prompt 18). See
       ARCHITECTURE.md §47.
