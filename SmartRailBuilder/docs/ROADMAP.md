@@ -1000,7 +1000,68 @@ REGRESSION (must still work exactly as before):
 - [ ] Existing-rail crossings still preserved in all three modes
 - [ ] Two players building through water simultaneously — confirm complete isolation
 
-## Phase 19+ — Reserved for Future Features (planned only when reached)
+## Phase 19 — Smart Terrain Adaptation & Rail Connectivity (Project Prompt 19) — COMPLETE (awaiting in-game confirmation)
+
+Status: reviewed every terrain/rail behavior Project Prompt 19 asked about against the
+actual implementation rather than assuming gaps — most of it (one-block slopes, existing
+rail preservation, strict mode isolation, order-independent rail placement, per-player
+multiplayer isolation) was already correct, and is now covered by real, executing tests
+for the first time, including at the EXECUTION level (not just planning) via a new
+test-only `@minecraft/server` mock. Two genuine small gaps were found and closed:
+Normal Mode now gives a specific "unbreakable terrain" message for a floating
+obstruction directly at the rail's own spot (previously generic "too steep"), and now
+checks one additional block of headroom above the rail so a build no longer silently
+plans a rail directly beneath a 1-block-low overhang. See ARCHITECTURE.md §48 for the
+complete write-up, including why neither new check short-circuits the existing
+ascend/tunnel fallback machinery (letting a real player-like "climb over it" solution
+be tried first is the smarter, more "carefully built railway" behavior, not a bug) and
+a real bug this session's own test harness caught and fixed in itself before it could
+give a false negative on real code.
+
+### Phase 19 Manual Testing Checklist
+TERRAIN:
+- [ ] Completely flat terrain, a one-block hill, a one-block depression — unchanged
+      from Phase 11, confirm still smooth
+- [ ] A multi-step staircase (several consecutive one-block rises) — confirm a real,
+      continuous climb, no floating rails, no gaps
+- [ ] A steep, THIN obstruction (should auto-tunnel) vs. a genuinely un-tunnelable one
+      (solid/unbreakable, wide) — confirm the first bores through and the second
+      rejects cleanly with a specific message, never a sudden vertical jump
+- [ ] A single floating unbreakable block (e.g. exposed bedrock) directly in the path,
+      with open space just above it — confirm the build now climbs over it automatically
+      rather than rejecting
+- [ ] A rail position with solid ceiling exactly 1 block above it (a low overhang) —
+      confirm this is now rejected with a specific "not enough clearance" message,
+      not silently built with a rider clipping into the ceiling
+
+RAILS / INTERSECTIONS:
+- [ ] Cross an existing hand-built rail with a new Normal Mode railway — confirm the
+      existing rail's shape/orientation is completely undisturbed after the new build
+      finishes (this is the one thing this session's Node-only tests cannot confirm —
+      see ARCHITECTURE.md §48.6's disclosed neighbor-update-side-effect uncertainty)
+- [ ] Repeat crossing at a T-junction and a perpendicular intersection
+- [ ] Cross each of the 4 rail types with a new build using a DIFFERENT rail type
+- [ ] Build a new railway that crosses ANOTHER completed build from this addon (two
+      generated railways meeting) — confirm both remain intact and connected on both sides
+
+STARTING / ENDING RAIL:
+- [ ] Start a build directly facing a wall/bedrock/low ceiling — confirm a specific,
+      accurate rejection message, and confirm the player's facing direction (not some
+      other direction) is what's reported
+- [ ] Confirm the very first and very last rail of an ordinary build are not rotated
+      or connected in an unexpected direction
+
+REGRESSION (must still work exactly as before):
+- [ ] Bridge Mode: gradual ascent, height 1-16, material selection + automatic quantity
+- [ ] Underground Mode: depth 1-20, tunnel clearance, waterproof tunnels
+- [ ] Underwater support (Phase 18) — shallow crossings, Bridge-over-water, Underground
+      water sealing
+- [ ] Cancellation (leave/dimension change/death/game mode change) still stops a build
+      cleanly and immediately
+- [ ] Two players building simultaneously (including near/through each other) — confirm
+      complete isolation and no corruption from either build
+
+## Phase 20+ — Reserved for Future Features (planned only when reached)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is
 currently dark and will spawn mobs; worth a deliberate decision) · cave-floor filling for
 Underground Mode (BridgeSupportBuilder is the natural reuse) · curved rails · undo
@@ -1011,7 +1072,9 @@ additional building modes beyond the three permanent ones (e.g. a future "Bluepr
 of these is a registry entry, not a rewrite) · sealing Underground's best-effort landing
 buffer against water too (currently just omitted when unsafe, see ARCHITECTURE.md
 §47.10) · a wider (not just lateral) waterproof shell for large aquifer pockets, if
-in-game testing shows the current thin seal is ever insufficient.
+in-game testing shows the current thin seal is ever insufficient · a mock for
+`@minecraft/server-ui` so `ui/BuildMenu.js` can finally be covered by an automated test
+(see ARCHITECTURE.md §48.10).
 
 Each of these gets the same treatment as Phases 2–15: design discussion first, one
 milestone at a time, your testing before moving on.

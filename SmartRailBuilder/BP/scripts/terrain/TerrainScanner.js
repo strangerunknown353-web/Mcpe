@@ -171,15 +171,25 @@ const BUILDABLE_CLASSIFICATIONS = Object.freeze([
  *   superseded, not deleted — read together they show why the initial
  *   choice was reasonable and why it needed revisiting once real
  *   terrain was actually tested.
+ * @property {boolean} isExistingRail Added Project Prompt 19. `true` if the block at the
+ *   rail's own position is already one of the 4 recognized rail types (config/RailConfig.js's
+ *   RAIL_ITEM_ID_SET) — informational only; this field does not itself drive any
+ *   accept/preserve decision (that logic already existed, see RAIL_ITEM_ID_SET's own doc).
  * @property {boolean} isLoaded
  * @property {boolean} isInBounds
  * @property {TerrainClassification} classification
  * @property {string} [hazardBlockId] Populated only when classification is HAZARD.
- * @property {string} [unsupportedReason] Added Roadmap Phase 12. Populated only when
- *   classification is UNSUPPORTED and the cause was a failed tunnel attempt — one of
- *   TunnelDetector's failure reasons ("UNBREAKABLE", "HAZARD", "TOO_LONG", "UNLOADED",
- *   "OUT_OF_BOUNDS", "FLOOR_GAP"). Undefined for a bigger drop or a peak/valley reversal
- *   (Roadmap Phase 11 UNSUPPORTED cases, which keep the generic "too steep" message).
+ * @property {string} [unsupportedReason] Added Roadmap Phase 12. Populated when
+ *   classification is UNSUPPORTED and the cause is one of: a failed tunnel attempt (one
+ *   of TunnelDetector's failure reasons — "UNBREAKABLE", "HAZARD", "TOO_LONG", "UNLOADED",
+ *   "OUT_OF_BOUNDS", "FLOOR_GAP"); water too deep to safely ride through directly, Project
+ *   Prompt 18 ("WATER_TOO_DEEP"); an unbreakable block sitting directly at the rail's own
+ *   spot over otherwise-solid ground, Project Prompt 19 ("UNBREAKABLE" — the same string
+ *   as the tunnel-failure case, since it maps to the same player-facing message); or
+ *   insufficient headroom one block above an otherwise-buildable rail spot, Project
+ *   Prompt 19 ("LOW_CLEARANCE" — see `_checkHeadroom()`). Undefined for a bigger drop or
+ *   a peak/valley reversal (Roadmap Phase 11 UNSUPPORTED cases, which keep the generic
+ *   "too steep" message).
  * @property {import("../utils/DirectionUtils.js").CardinalDirection|null} slopeDirection
  *   Added Roadmap Phase 11. Null for a flat or tunnel rail block. Otherwise, the compass
  *   direction this specific rail block should visually ascend toward — see
@@ -1321,6 +1331,15 @@ export class TerrainScanner {
     // execution strategy — see config/RailConfig.js's RAIL_ITEM_ID_SET doc
     // for the full bugfix write-up and ARCHITECTURE.md §46.5.
     const isAboveReplaceable = aboveBlock.isAir || REPLACEABLE_BLOCK_ID_SET.has(aboveBlockId) || RAIL_ITEM_ID_SET.has(aboveBlockId);
+    // Added Project Prompt 19 (SMART TERRAIN ANALYSIS): an explicit,
+    // named field for "is the rail's own spot already an existing rail" —
+    // this was already computed inline as part of `isAboveReplaceable`
+    // above (bugfix pass before Project Prompt 18), but never exposed on
+    // the fact itself. Purely informational/introspective — no decision in
+    // this file changes based on it; see config/RailConfig.js's
+    // RAIL_ITEM_ID_SET doc for where the actual accept/preserve behavior
+    // lives.
+    const isExistingRail = RAIL_ITEM_ID_SET.has(aboveBlockId);
 
     let hazardBlockId;
     if (HAZARD_BLOCK_ID_SET.has(groundBlockId)) hazardBlockId = groundBlockId;
@@ -1353,6 +1372,21 @@ export class TerrainScanner {
       // PathValidator now turns into a specific "use Bridge or Underground"
       // message — see PathValidator.js.
       classification = TerrainClassification.UNSUPPORTED;
+    } else if (UNBREAKABLE_BLOCK_ID_SET.has(aboveBlockId)) {
+      // Added Project Prompt 19 (SMART TERRAIN ANALYSIS / EXISTING BLOCKS):
+      // previously an unbreakable block sitting directly at the rail's own
+      // spot (bedrock, barrier, etc., with otherwise solid ground beneath —
+      // a floating obstruction, not a gap) fell through to the generic
+      // `!isAboveReplaceable` branch below and reported the same "too
+      // steep" message every other flat obstruction gets. Distinguished
+      // here the same way TunnelDetector already distinguishes it for a
+      // failed tunnel attempt (`unsupportedReason: "UNBREAKABLE"` — the
+      // exact same string, already wired through PathValidator's
+      // UNSUPPORTED_REASON_TO_REASON to a specific message) — a player
+      // told "too steep" about a single bedrock block has no idea what to
+      // actually do about it; "unbreakable terrain" does.
+      classification = TerrainClassification.UNSUPPORTED;
+      unsupportedReason = "UNBREAKABLE";
     } else if (aboveBlock.isLiquid) {
       // WATER DETECTION (Project Prompt 18): the rail's own spot is a
       // liquid block, but the ground directly beneath it IS solid (already
@@ -1383,12 +1417,41 @@ export class TerrainScanner {
       classification = TerrainClassification.FLAT_SAFE;
     }
 
+    // AVAILABLE CLEARANCE (Project Prompt 19, SMART TERRAIN ANALYSIS): one
+    // extra block read, ONLY when every check above already accepted this
+    // position (dry flat OR safe shallow water) — an already-rejected
+    // position never pays this cost, keeping this in line with the
+    // project's standing "don't scan what you don't need" performance
+    // discipline (see PERFORMANCE in ARCHITECTURE.md's Project Prompt 19
+    // entry). Normal Mode previously only ever checked the rail's own
+    // block, never the block directly above THAT — meaning a rail could be
+    // planned directly beneath a 1-block-low ceiling (an overhang, the
+    // underside of a floating structure) that a player riding through
+    // would visibly clip into. `_checkHeadroom()` closes that gap the same
+    // way Bridge/Underground Mode already reserve real headroom above
+    // their own rail level.
+    if (classification === TerrainClassification.FLAT_SAFE) {
+      const headroom = this._checkHeadroom(dimension, railPosition);
+      if (!headroom.clear) {
+        if (headroom.reason === "HAZARD") {
+          classification = TerrainClassification.HAZARD;
+          hazardBlockId = headroom.blockingBlockId;
+        } else {
+          classification = TerrainClassification.UNSUPPORTED;
+          unsupportedReason = headroom.reason ?? "LOW_CLEARANCE";
+        }
+        isUnderwater = false;
+        waterInfo = undefined;
+      }
+    }
+
     return {
       position: railPosition,
       groundBlockId,
       aboveBlockId,
       isGroundSolid,
       isAboveReplaceable,
+      isExistingRail,
       isLoaded: true,
       isInBounds: true,
       classification,
@@ -1399,6 +1462,47 @@ export class TerrainScanner {
       isUnderwater,
       waterInfo,
     };
+  }
+
+  /**
+   * AVAILABLE CLEARANCE (Project Prompt 19): reads exactly one block —
+   * directly above the rail's own spot — and reports whether it's clear
+   * enough for a player riding through to not visibly clip into it.
+   * Deliberately narrow (one read, no recursion, no search) — this is not
+   * a second tunnel/clearance system, just the one additional block Normal
+   * Mode was previously never checking. Mirrors the same
+   * hazard-then-unbreakable-then-generic ordering `_scanPosition()` itself
+   * uses, so a dangerous or unbreakable ceiling gets its own specific
+   * reason rather than a generic "not enough room" one.
+   *
+   * @param {import("@minecraft/server").Dimension} dimension
+   * @param {{x: number, y: number, z: number}} railPosition
+   * @returns {{clear: boolean, reason?: "HAZARD"|"UNBREAKABLE"|"LOW_CLEARANCE", blockingBlockId?: string}}
+   * @private
+   */
+  _checkHeadroom(dimension, railPosition) {
+    const headroomPosition = { x: railPosition.x, y: railPosition.y + 1, z: railPosition.z };
+    const read = readBlock(dimension, headroomPosition);
+    if (read.status !== "OK") {
+      // Fails safe: an unreadable headroom position is treated as blocked
+      // rather than assuming clearance exists — the same "don't guess
+      // permissive" principle terrain/WaterDetector.js's hasLiquidAbove()
+      // already established (Project Prompt 18).
+      return { clear: false, reason: "LOW_CLEARANCE" };
+    }
+    const block = read.block;
+    if (HAZARD_BLOCK_ID_SET.has(block.typeId)) {
+      return { clear: false, reason: "HAZARD", blockingBlockId: block.typeId };
+    }
+    if (UNBREAKABLE_BLOCK_ID_SET.has(block.typeId)) {
+      return { clear: false, reason: "UNBREAKABLE" };
+    }
+    // Liquid is treated as clear here, consistent with Bridge Mode's own
+    // headroom tolerance (Project Prompt 18) — a rider's head briefly
+    // brushing a water block one above an otherwise dry, safe rail is not
+    // meaningfully different from Bridge Mode's already-accepted case.
+    const clear = block.isAir || block.isLiquid || REPLACEABLE_BLOCK_ID_SET.has(block.typeId) || RAIL_ITEM_ID_SET.has(block.typeId);
+    return clear ? { clear: true } : { clear: false, reason: "LOW_CLEARANCE" };
   }
 
   /**
@@ -1420,6 +1524,7 @@ export class TerrainScanner {
       aboveBlockId: undefined,
       isGroundSolid: false,
       isAboveReplaceable: false,
+      isExistingRail: false,
       isLoaded: true,
       isInBounds: true,
       classification: TerrainClassification.UNSUPPORTED,
@@ -1445,6 +1550,7 @@ export class TerrainScanner {
       aboveBlockId: undefined,
       isGroundSolid: false,
       isAboveReplaceable: false,
+      isExistingRail: false,
       isLoaded: classification !== TerrainClassification.UNLOADED,
       isInBounds: classification !== TerrainClassification.OUT_OF_BOUNDS,
       classification,

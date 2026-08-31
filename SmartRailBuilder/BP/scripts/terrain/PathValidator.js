@@ -24,6 +24,13 @@ import { LocalizationKeys } from "../localization/LocalizationKeys.js";
  *   them would mean a reachable code path with player-facing text that
  *   became false the moment slopes shipped ("Slopes aren't supported yet").
  *
+ * PROJECT PROMPT 19: UNBREAKABLE-AT-RAIL-SPOT AND LOW-CLEARANCE MESSAGES
+ *   Two more specific reasons, both set directly by `TerrainScanner._scanPosition()`'s
+ *   new checks (an unbreakable block at the rail's own spot; insufficient headroom one
+ *   block above it — see that file's SMART TERRAIN ANALYSIS section) and resolved
+ *   through the SAME `unsupportedReason` table below every other specific UNSUPPORTED
+ *   reason already uses — no new special-case code needed in `validate()` itself.
+ *
  * PROJECT PROMPT 18: WATER-SPECIFIC REJECTION MESSAGE
  *   Water is no longer folded into the generic "too steep"/HAZARD messages
  *   for every case. A rail-level water column too deep to safely ride
@@ -97,6 +104,8 @@ export const PathRejectionReason = Object.freeze({
   OUT_OF_BOUNDS: "OUT_OF_BOUNDS",
   /** Added Project Prompt 18: water too deep/wide for Normal Mode to safely carry a player through — see WATER_CROSSING handling in `validate()` below. */
   WATER_CROSSING_UNSAFE: "WATER_CROSSING_UNSAFE",
+  /** Added Project Prompt 19: not enough clearance one block above an otherwise-buildable rail spot — see terrain/TerrainScanner.js's `_checkHeadroom()`. */
+  LOW_CLEARANCE: "LOW_CLEARANCE",
 });
 
 /** Classifications PathValidator treats as buildable — never rejected, never looked up in CLASSIFICATION_TO_REASON. */
@@ -142,6 +151,8 @@ const UNSUPPORTED_REASON_TO_REASON = Object.freeze({
   OUT_OF_BOUNDS: PathRejectionReason.OUT_OF_BOUNDS,
   /** Added Project Prompt 18 — see terrain/TerrainScanner.js's `_scanPosition()` "WATER DETECTION" section. */
   WATER_TOO_DEEP: PathRejectionReason.WATER_CROSSING_UNSAFE,
+  /** Added Project Prompt 19 — see terrain/TerrainScanner.js's `_checkHeadroom()`. */
+  LOW_CLEARANCE: PathRejectionReason.LOW_CLEARANCE,
 });
 
 /**
@@ -159,6 +170,7 @@ const REASON_TO_LOCALIZATION_KEY = Object.freeze({
   [PathRejectionReason.UNLOADED_CHUNK]: LocalizationKeys.PATH_REJECTED_UNLOADED,
   [PathRejectionReason.OUT_OF_BOUNDS]: LocalizationKeys.PATH_REJECTED_OUT_OF_BOUNDS,
   [PathRejectionReason.WATER_CROSSING_UNSAFE]: LocalizationKeys.PATH_REJECTED_WATER_CROSSING,
+  [PathRejectionReason.LOW_CLEARANCE]: LocalizationKeys.PATH_REJECTED_LOW_CLEARANCE,
 });
 
 /**

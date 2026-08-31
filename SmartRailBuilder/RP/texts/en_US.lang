@@ -32,9 +32,10 @@ ryzenRailBuilder.path.rejected.tooSteep=§cTerrain too steep. Tunnel or bridge s
 ryzenRailBuilder.path.rejected.hazard=§cThe path is blocked by a hazardous block (lava, fire, or similar).
 ryzenRailBuilder.path.rejected.unloaded=§cPart of the path isn't loaded. Move closer and try again.
 ryzenRailBuilder.path.rejected.outOfBounds=§cThe path would go outside the world's height limits.
-ryzenRailBuilder.path.rejected.unbreakable=§cCannot tunnel here — solid, unbreakable terrain blocks the way.
+ryzenRailBuilder.path.rejected.unbreakable=§cThe path is blocked by solid, unbreakable terrain (bedrock or similar) that cannot be cleared.
 ryzenRailBuilder.path.rejected.tunnelTooLong=§cThe tunnel needed here would be too long.
 ryzenRailBuilder.path.rejected.waterCrossingUnsafe=§cThis crossing has too much open water for Normal Mode. Use Bridge Mode to cross over it, or Underground Mode to tunnel beneath it.
+ryzenRailBuilder.path.rejected.lowClearance=§cThere isn't enough headroom above the rail here for a player to safely pass through.
 
 ## --- Project Prompt 9: Pipeline Integration & Player Feedback ---
 ryzenRailBuilder.actionbar.preparing=Preparing railway...

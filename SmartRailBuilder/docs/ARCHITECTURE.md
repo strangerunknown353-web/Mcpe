@@ -4027,3 +4027,248 @@ downward — reused, not widened.
   strategies at all, since they import `@minecraft/server` directly; see tests/README.md).
 - **Not yet confirmed in-game** — everything above is a planning-side/Node-only
   verification. See ROADMAP.md's new Phase 18 testing checklist.
+
+## 48. Smart Terrain Adaptation & Rail Connectivity (Roadmap Phase 19, Project Prompt 19)
+
+### 48.1 — What This Session Actually Changed vs. Confirmed
+
+Project Prompt 19 asked this codebase to "understand" flat terrain, one-block slopes,
+existing rails, intersections, and mode isolation better. Reading the existing
+implementation first (rather than assuming gaps) found that almost all of this was
+already correct, by construction, since Roadmap Phases 11/12/16/17/18:
+
+- One-block slopes, tunnels, existing-rail preservation, and strict mode isolation
+  (`BuildingMode` fixed for the lifetime of one `BuildRequest`, no code path anywhere
+  reads or writes it after `BuildRequestCreationStage`) were all already real, already
+  tested at the planning level (Project Prompt 18's harness), and — per §29.1/§54 —
+  RailPermutationBuilder never depends on vanilla auto-connect at all, so placement
+  order literally cannot affect a rail's own shape (see §48.6).
+- Two genuine, small gaps were found and closed (§48.2). Everything else this session
+  did was **verify** the above with real, executing tests — many for the first time at
+  the EXECUTION level, not just planning (§48.7) — and document the findings honestly,
+  rather than rewriting working code to look busy.
+
+### 48.2 — Two Real Gaps Closed: Unbreakable-at-Rail-Spot and Clearance
+
+`TerrainScanner._scanPosition()` gained two new checks, both additive (no existing
+buildable path became rejected by them under ordinary terrain — see the regression test
+"open sky above flat rail: never falsely flagged" in `tests/terrain.test.mjs`):
+
+1. **Unbreakable block directly at the rail's own spot** (bedrock, barrier, etc., with
+   otherwise-solid ground beneath — a floating obstruction, not a gap) previously fell
+   through to the same generic `!isAboveReplaceable` → `UNSUPPORTED` → "too steep"
+   message every other flat obstruction gets. Now tagged `unsupportedReason:
+   "UNBREAKABLE"` — the exact same string TunnelDetector's own failure path already
+   used, so `PathValidator`'s existing `UNSUPPORTED_REASON_TO_REASON` table needed no
+   new entry, just this one new producer of a string it already understood.
+2. **Available clearance**: Normal Mode previously only ever checked the rail's own
+   block, never the block directly above THAT. `_checkHeadroom()` (new, one extra
+   block read, only when every other check already accepted the position) closes this:
+   a rail planned directly beneath a 1-block-low overhang — the underside of a floating
+   structure, a low cave ceiling — is now rejected with a specific `"LOW_CLEARANCE"`
+   reason instead of silently being planned somewhere a player would visibly clip into
+   the ceiling riding through it.
+
+**Why neither check was made "terminal" the way Project Prompt 18's `WATER_TOO_DEEP`
+was** — a genuinely interesting finding from this session's OWN test harness, not
+assumed going in: `tests/terrain.test.mjs`'s first draft of both tests targeted a
+MID-PATH position (index 2 of a 5-long path) and got the wrong classification back
+(`ASCENDING`/`TUNNEL` instead of the expected `UNSUPPORTED`). Tracing why revealed that
+`_resolveSteppedPosition()`'s existing ascend/tunnel fallback machinery runs
+REGARDLESS of `unsupportedReason` (only `WATER_TOO_DEEP` was ever added to its terminal
+early-return list) — so a single-block unbreakable nub or a single-block-low ceiling at
+a MID-PATH position gets a chance to be climbed over or tunneled through before either
+new reason is ever the FINAL verdict. Checked against `WATER_TOO_DEEP`'s own reasoning
+(§47.3) to see if the same "make it terminal" treatment applied: it doesn't — unlike
+water (where an ascend candidate's own ground check is provably doomed, since it's
+still water), an ascend or tunnel attempt around a single unbreakable block or a single
+low ceiling block is a GENUINELY VALID fix, and letting the existing machinery try it
+first is the smarter, more "carefully built player railway" behavior Project Prompt 19
+explicitly asked for — not a bug to patch over. Both new checks are therefore
+deliberately NOT terminal; their effect is fully, unconditionally observable only at
+the path's very first position (`scanPath()` never calls `_resolveSteppedPosition()`
+for index 0), which is also exactly Section 7's "starting rail" concern — tested there
+directly. A mid-path obstruction still eventually surfaces the correct specific message
+if NEITHER ascending NOR tunneling can resolve it (TunnelDetector's own pre-existing
+`"UNBREAKABLE"` failure path takes over at that point) — the new checks simply stop a
+misleading generic message from being the FIRST thing tried, without blocking a real
+alternative solution from being tried first.
+
+### 48.3 — `isExistingRail`: Named, Not New
+
+`TerrainPositionFact.isExistingRail` is a new, explicitly-named field — but the
+DECISION it describes (`RAIL_ITEM_ID_SET.has(aboveBlockId)`) already existed, inline,
+inside `isAboveReplaceable`'s computation since the bugfix pass before Project Prompt
+18. Nothing about accept/reject/preserve behavior changed; this only makes an
+already-correct fact inspectable (by tests, by a future UI/logging consumer) without
+requiring a second read of the same block. See RailConfig.js's `RAIL_ITEM_ID_SET` doc
+for where the actual preserve-at-placement-time logic lives (unchanged).
+
+### 48.4 — Rail Intersection Protection: Confirmed Correct, Not Rewritten
+
+Reviewed against every scenario Project Prompt 19 lists (parallel, perpendicular,
+T-junction, existing straight railway, a new railway crossing an existing one,
+different rail types, two generated railways meeting) — all six are the SAME case at
+the scanning/placement layer: a position on the new path's own column either already
+holds one of the 4 rail types (preserved, untouched, regardless of ITS shape or the
+crossing geometry) or it doesn't (built normally). This project never reads or
+reasons about an existing rail's own `rail_direction`/curve shape — only whether a
+position IS a rail at all — which is precisely why perpendicular, T-junction, and
+parallel crossings are all handled identically and correctly by the same one-line
+check: a real vanilla rail block can only ever represent ONE shape at a time (there is
+no native "+" 4-way crossing block), so "never touch what's already there" is the only
+generally-safe policy for ANY crossing geometry, not a simplification that happens to
+work for the easy cases. `tests/terrain.test.mjs` and `tests/execution.test.mjs`
+between them now cover all four rail types crossing a path (both at the scanning layer
+and, for `StraightRailStrategy`/`BridgeExecutionStrategy`, at actual placement), a
+parallel rail one block to the side (confirmed never even read), and two consecutive
+existing-rail positions (simulating a prior build's own railway) surviving a new
+build crossing through.
+
+### 48.5 — "If a Safe Connection Cannot Be Guaranteed, Reject" — Already True, By Construction
+
+Project Prompt 19 asks for this as an explicit policy. It already holds, structurally:
+every execution strategy's per-block loop re-verifies the exact position immediately
+before writing to it (the "state can change mid-build" discipline established since
+Project Prompt 10) — if a position that scanning approved has since become genuinely
+obstructed (not a recognized existing rail, not still clear) by the time placement
+reaches it, the WHOLE BUILD stops there (`TERRAIN_CHANGED_*`/`*_OBSTRUCTED_DURING_BUILD`),
+keeping everything already placed and reporting exactly why, rather than forcing a
+questionable connection. This is also exactly the mechanism that makes two players'
+builds crossing the same physical space safe (§48.9) — nothing new was needed here,
+only confirmed and exercised by `tests/execution.test.mjs`'s existing-rail-crossing
+scenarios, which now assert on the ACTUAL placed blocks in a mutable mock world, not
+just the plan.
+
+### 48.6 — Rail Placement Order: Confirmed a Non-Issue, Documented Rather Than "Fixed"
+
+Project Prompt 19 asks to "review the placement order because vanilla rail connections
+can depend on neighboring blocks." Traced end to end: `builder/RailPermutationBuilder.js`
+computes a rail's `rail_direction` (and, for powered types, `rail_data_bit`) from ONLY
+the build's own travel direction and (for slopes) `TerrainPositionFact.slopeDirection`
+— both fully known before a single block is placed. It never inspects a neighboring
+block, never relies on vanilla's neighbor-sensing auto-connect (see that file's own
+"WHY EXPLICIT, NOT AUTO-CONNECTED" — an intentional, disclosed design choice since
+Project Prompt 10/11, unconfirmed via official docs whether `setPermutation()` even
+triggers that auto-connect logic the way a real placement would, and this project chose
+not to depend on an unconfirmed behavior). Consequence: **placement order cannot affect
+any rail this addon places, structurally** — a block's own shape is fully determined at
+the moment its permutation is computed, independent of whether its neighbor was placed
+before or after it. This was confirmed, not newly designed, this session — via
+`tests/execution.test.mjs`'s direct assertions on `rail_direction` values for the
+starting rail, an ascending rail, and the ending rail of the same build, all placed in
+the existing left-to-right order with no reordering.
+
+**One genuine, unconfirmed-API risk, disclosed rather than solved (KNOWN LIMITATION,
+see §48.10):** this addon's OWN placed rails are unaffected by order, but placing a new
+rail block ADJACENT to a PRE-EXISTING, hand-placed or vanilla-auto-connected rail could,
+in principle, trigger a neighbor-update tick that causes the GAME (not this addon) to
+recompute the EXISTING rail's own shape — the same category of "is this scripted
+mutation observed by the game's other systems the same way a normal placement is"
+uncertainty as `Block.isSolid` (§34). This cannot be resolved without a live test;
+flagged for your in-game verification specifically at a crossing with a hand-built rail
+nearby, per the manual testing checklist (ROADMAP.md).
+
+### 48.7 — Testing: From Planning-Only to Full-Pipeline Coverage
+
+The single biggest infrastructure change this session: a new **test-only mock** of
+`@minecraft/server` (`node_modules/@minecraft/server/`, a `package.json` + `index.js`
+exporting `BlockPermutation`, `GameMode`, `EquipmentSlot`, `system.runJob` (drains a
+generator to completion — no real tick concept needed for what these tests check), and
+`world` (subscribable/emittable event signals)) plus `tests/mockPlayer.mjs` (a minimal
+in-memory `Player` + inventory `Container`). Together these unlock testing every
+EXECUTION-side class Project Prompt 18's harness could not reach at all —
+`StraightRailStrategy`, `BridgeExecutionStrategy`, `UndergroundExecutionStrategy`,
+`RailBuilder`, `TunnelExcavator`, `BridgeSupportBuilder`, `CancellationWatcher`,
+`InventoryManager`, `ResourceValidator` — none of these had ever been executed by any
+automated test before this session.
+
+**A real, load-bearing bug found and fixed in the test harness itself, before it could
+give a false negative on real code:** the first version of `tests/mockWorld.mjs`'s
+`Dimension.getBlock()` (Project Prompt 18) constructed a brand-new `MockBlock` on
+every call — harmless for planning-only tests (which never mutate the world) but fatal
+for execution tests: a `setPermutation()` call would mutate a transient object,
+discarded the instant that call returned, so every subsequent read of the same
+position saw the ORIGINAL, unmutated terrain. This surfaced immediately and
+unambiguously (starting/ending rails reading back as `undefined` states, a bridge deck
+reading back as still water, Underground's own excavation reading back as still solid
+stone one line after clearing it) the moment execution-level tests were first written
+— fixed by making the mock dimension's block store a persistent `Map`, populated
+lazily on first read, so a mutation genuinely "sticks" the way a real `Dimension`'s
+block storage does. Re-ran clean (0 regressions) against Project Prompt 18's full
+55-assertion planning-only suite immediately after.
+
+New test files: `tests/terrain.test.mjs` (66 assertions — flat/hill/depression/
+staircase/steep-tunnelable/un-tunnelable/ravine/mixed terrain, the two new §48.2
+checks, `isExistingRail`, all 4 rail types × crossing geometries, Bridge/Underground
+transition elevation profiles) and `tests/execution.test.mjs` (39 assertions —
+`RailPermutationBuilder` direction correctness, `StraightRailStrategy`'s starting/
+ending rail and existing-rail-crossing behavior with ACTUAL placed blocks inspected,
+`RailBuilder.run()`'s generator draining, Bridge/Underground execution-level water
+regressions, resource safety including a terrain-driven material-requirement increase,
+and `CancellationWatcher`'s real per-player isolation). Combined with the unchanged
+Project Prompt 18 suite: **160 assertions across 3 files, all passing**, `node --check`
+clean across every script file. See `tests/README.md` for the full breakdown and known
+gaps (`ui/BuildMenu.js`/`@minecraft/server-ui` still has no mock).
+
+### 48.8 — Resource Safety: Confirmed Unchanged, Verified Differently
+
+Section 10 asked that terrain-driven extra material need be included in the resource
+calculation BEFORE construction. This was already true — `planBridge()`'s
+`requiredSupportBlockCount` already scales with however much fill terrain actually
+requires (Roadmap Phase 16), computed entirely during planning, before `InventoryStage`
+ever runs. `tests/execution.test.mjs` adds a direct, concrete demonstration: the same
+bridge height/length over a DEEPER gap produces a strictly LARGER
+`requiredSupportBlockCount` than over shallow terrain, both computed before a single
+block is placed. `InventoryManager`/`ResourceValidator` themselves are completely
+unchanged this session — now covered by executing tests for the first time (exact
+resources, insufficient resources with the correct missing quantity, Creative bypass)
+rather than only reviewed by reading.
+
+### 48.9 — Multiplayer: Confirmed Isolated, Now With a Real Test
+
+Traced `core/BuildOrchestrator.js` (`_activePlayerIds`, a per-player `Set`, never
+global), `core/CancellationWatcher.js` (`_sessionsByPlayerId`, a per-player `Map`), and
+`core/BuildSession.js` (holds no shared reference to anything beyond the one player/
+dimension it was constructed for) end to end — all three were already correctly
+per-player, with nothing shared globally. `tests/execution.test.mjs` now exercises this
+directly rather than only by code reading: two `BuildSession`s registered with a real
+`CancellationWatcher`, one player's simulated `playerLeave` event fired, and the OTHER
+player's session confirmed completely unaffected (`isCancelled() === false`) — the
+first automated test in this project to exercise `CancellationWatcher` at all. A
+second test confirms two simultaneous `TerrainScanner.scanPath()` calls (the same
+scanner instance, deliberately, to prove the class itself holds no per-call state) for
+two different players/build vectors never cross-contaminate results. "If two builds
+conflict" (Section 12) reduces to §48.5's already-true per-block re-check discipline —
+no new conflict-resolution code was needed or added.
+
+### 48.10 — Known Limitations (disclosed, not hidden)
+
+- **Neighbor-update side effects on a PRE-EXISTING rail are unconfirmed** — see §48.6.
+  This addon's own placed rails are provably order-independent; whether placing a new
+  rail next to a hand-built one ever visually disturbs the hand-built one's own shape
+  via an engine-level neighbor update cannot be ruled out without a live test.
+- **The new clearance check can reject a crossing over an existing railway** that
+  happens to run through a low tunnel/overhang with less than 2 blocks of headroom —
+  correct, conservative behavior (a player genuinely couldn't ride through there
+  either), but worth knowing before testing: an existing railway built with tight
+  clearance can now block a NEW crossing build where it previously would not have.
+- **No mock exists for `@minecraft/server-ui`** — `ui/BuildMenu.js` and the whole
+  menu/form flow remain completely untested by this harness.
+- **No in-game verification** for anything in this session, same as every session
+  before it — see ROADMAP.md's Phase 19 testing checklist.
+
+### 48.11 — Validation Performed
+
+- `node --check` across every script file in `BP/scripts/` and every test file — 0
+  failures.
+- 160 assertions across `tests/water.test.mjs` (55, unchanged from Project Prompt 18),
+  `tests/terrain.test.mjs` (66, new), and `tests/execution.test.mjs` (39, new), all
+  passing.
+- One real bug found and fixed in the test harness's own mock world before it could
+  produce a false negative (§48.7); several test-authoring mistakes in this session's
+  OWN first-draft tests (wrong expected elevation for a bridge's deck-level crest,
+  wrong expected Y for Underground's first ramp step, an incomplete staircase's floor
+  continuation) were found by running them and fixed before being trusted — full
+  honest accounting rather than silently rewriting the expectation without noting why.
+- **Not yet confirmed in-game.**

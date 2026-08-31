@@ -58,11 +58,26 @@ class MockBlock {
     };
   }
 
+  /**
+   * Added Project Prompt 19: previously a stub (this harness only tested
+   * planning-side code, which never mutates the world). Now that the new
+   * `node_modules/@minecraft/server` mock's `BlockPermutation.resolve()`
+   * returns a real `{typeId, states}` object, this applies it properly —
+   * typeId AND state both change, and the block becomes non-air/non-liquid
+   * (setting a real permutation always replaces whatever was there before,
+   * matching real Bedrock behavior — a placed rail displaces water, air,
+   * grass, etc.) unless the new typeId is itself air or a liquid.
+   */
   setPermutation(permutation) {
-    // Only used by execution-time classes this harness doesn't exercise —
-    // present so a stray call doesn't throw, not because planning-side
-    // code ever calls it (TerrainScanner never mutates the world).
-    this.typeId = permutation?.typeId ?? this.typeId;
+    if (!permutation) return;
+    this.typeId = permutation.typeId ?? this.typeId;
+    this._permutationState = permutation.states ?? {};
+    this.isAir = this.typeId === "minecraft:air";
+    this.isLiquid = this.typeId === "minecraft:water" || this.typeId === "minecraft:lava";
+    this.permutation.getState = (key) => {
+      if (key === "liquid_depth" && this.isLiquid) return this._liquidDepth;
+      return this._permutationState[key];
+    };
   }
 }
 
@@ -82,6 +97,17 @@ export const LAVA = Object.freeze({ typeId: "minecraft:lava", isLiquid: true });
 export function createMockDimension({ groundY = 63, overrides = {}, unloaded = [], outOfBounds = [] } = {}) {
   const unloadedSet = new Set(unloaded);
   const outOfBoundsSet = new Set(outOfBounds);
+  // Added Project Prompt 19: a real, persistent block store. Planning-side
+  // code (Project Prompt 18's tests) never calls `block.setPermutation()`,
+  // so a fresh `MockBlock` per `getBlock()` call was harmless there — but
+  // EXECUTION-side code (StraightRailStrategy, TunnelExcavator, etc.)
+  // mutates the block it reads and expects that mutation to be visible on
+  // a later read of the SAME position (its own per-block re-check, a
+  // different strategy reading a position another one just wrote, etc.).
+  // A `Map` keyed by coordinate, populated lazily on first read, is what
+  // makes `setPermutation()` actually "stick" the way a real Dimension's
+  // block storage does.
+  const blocks = new Map();
 
   return {
     getBlock(position) {
@@ -95,13 +121,14 @@ export function createMockDimension({ groundY = 63, overrides = {}, unloaded = [
       if (unloadedSet.has(key)) {
         return undefined;
       }
-      if (overrides[key]) {
-        return new MockBlock(overrides[key]);
+      if (blocks.has(key)) {
+        return blocks.get(key);
       }
-      if (position.y <= groundY) {
-        return new MockBlock(STONE);
-      }
-      return new MockBlock(AIR);
+
+      const spec = overrides[key] ?? (position.y <= groundY ? STONE : AIR);
+      const block = new MockBlock(spec);
+      blocks.set(key, block);
+      return block;
     },
   };
 }

@@ -967,3 +967,54 @@ consecutive session on a base that has still never been confirmed in-game — se
   unconditional liquid rejection), in ARCHITECTURE.md §47.11. `node --check` clean
   across every script file.
 - **Not yet confirmed in-game.**
+
+### Project Prompt 19 — Smart Terrain Adaptation & Rail Connectivity
+- **Reviewed, not rewritten:** one-block slopes, existing-rail preservation across all
+  crossing geometries (parallel/perpendicular/T-junction/different types/two generated
+  railways meeting), strict per-request mode isolation, and rail-placement-order
+  independence were all confirmed already correct against the actual implementation —
+  see ARCHITECTURE.md §48.1/§48.4/§48.5/§48.6 for the full trace, including why "never
+  touch an existing rail's own shape" is the only generally-safe policy for every
+  crossing geometry, not a simplification.
+- **Added: Normal Mode gives a specific "unbreakable terrain" message** for an
+  unbreakable block sitting directly at the rail's own spot over otherwise-solid
+  ground — previously folded into the generic "too steep" message. Reuses the same
+  `unsupportedReason: "UNBREAKABLE"` string TunnelDetector's own failure path already
+  produced; no new `PathValidator` table entry needed. ARCHITECTURE.md §48.2.
+- **Added: Available clearance (Section 1's "Smart Terrain Analysis").** Normal Mode
+  now also checks the block directly above the rail's own spot (`_checkHeadroom()`),
+  rejecting with a new, specific `"LOW_CLEARANCE"` reason if it's blocked — previously
+  a rail could be planned directly beneath a 1-block-low overhang with no warning.
+  Neither new check short-circuits the existing ascend/tunnel fallback (a real "climb
+  over it" solution is tried first, same as a careful player would) — see
+  ARCHITECTURE.md §48.2 for why, including the mistaken test expectation this session's
+  own harness caught and corrected before it was trusted.
+- **Added: `TerrainPositionFact.isExistingRail`** — an explicit, named field for a
+  decision (`RAIL_ITEM_ID_SET.has(aboveBlockId)`) that already existed inline; purely
+  informational, no behavior changed. ARCHITECTURE.md §48.3.
+- **Added: a test-only `@minecraft/server` mock** (`node_modules/@minecraft/server/`)
+  and `tests/mockPlayer.mjs` — unlocks testing every EXECUTION-side class for the first
+  time (strategies, `TunnelExcavator`, `BridgeSupportBuilder`, `RailBuilder`,
+  `CancellationWatcher`, `InventoryManager`, `ResourceValidator`), none of which had
+  ever been run by an automated test before this session. Never bundled into the
+  shipped `.mcaddon` — see `tests/README.md`.
+- **Fixed a real bug in the test harness's own mock world**, found by the first
+  execution-level tests: `tests/mockWorld.mjs`'s `Dimension.getBlock()` returned a
+  brand-new object every call, so a `setPermutation()` mutation was silently discarded
+  — harmless for Project Prompt 18's planning-only tests, but a false negative waiting
+  to happen for anything that writes to the world. Fixed by making the mock's block
+  store a persistent `Map`. ARCHITECTURE.md §48.7.
+- **Files created:** `tests/terrain.test.mjs` (66 assertions), `tests/execution.test.mjs`
+  (39 assertions), `tests/mockPlayer.mjs`, `node_modules/@minecraft/server/package.json`
+  + `index.js`.
+- **Files modified:** `terrain/TerrainScanner.js` (`_scanPosition()`'s two new checks,
+  `_checkHeadroom()`), `terrain/PathValidator.js` (`LOW_CLEARANCE` reason),
+  `localization/LocalizationKeys.js` + `en_US.lang` (new key, two corrected messages
+  whose old wording no longer matched reality), `tests/mockWorld.mjs` (stateful block
+  store, real `setPermutation()`), `config/Constants.js` + both manifests (version
+  0.1.11 → 0.1.12).
+- **Validation:** 160 assertions across 3 test files (55 unchanged from Project Prompt
+  18, 66 + 39 new), all passing. `node --check` clean across every script file. Full
+  detail, including the real bugs this process found and fixed (in both the shipped
+  code and the test harness itself) before being trusted, in ARCHITECTURE.md §48.11.
+- **Not yet confirmed in-game.**

@@ -459,6 +459,30 @@ genuine regression evidence, just not a re-run of the original files byte-for-by
 - [ ] **Awaiting your in-game test pass** — full checklist in ROADMAP.md's new Phase 18
       entry.
 
+## Completed — Roadmap Phase 19: Smart Terrain Adaptation & Rail Connectivity ✅
+- [x] **Reviewed, confirmed correct, not rewritten**: one-block slopes, existing-rail
+      preservation across every crossing geometry, strict mode isolation, and
+      rail-placement-order independence. §48.1/§48.4/§48.5/§48.6.
+- [x] **Added: specific "unbreakable terrain" message** for a floating unbreakable
+      block directly at the rail's own spot (previously generic "too steep"). §48.2.
+- [x] **Added: Available clearance check** — Normal Mode now checks one block of
+      headroom above the rail, rejecting with a specific `"LOW_CLEARANCE"` reason
+      instead of silently planning a rail under a low overhang. Neither new check
+      blocks the existing ascend/tunnel fallback from trying a real fix first. §48.2.
+- [x] **Added: `isExistingRail`** explicit field (informational only, no behavior
+      change). §48.3.
+- [x] **Added: a test-only `@minecraft/server` mock + mock Player** — unlocks testing
+      every execution-side class for the first time. Never bundled into the `.mcaddon`.
+- [x] **Fixed a real bug in the test harness's own mock world** (stateless block reads
+      silently discarding execution-time mutations) before it could produce a false
+      negative on real code. §48.7.
+- [x] 160 assertions across 3 test files (55 + 66 new + 39 new), all passing.
+      `node --check` clean across every script file.
+- [ ] **Awaiting your in-game test pass** — full checklist in ROADMAP.md's new Phase 19
+      entry, including the one thing this session's Node-only tests genuinely cannot
+      confirm: whether placing a new rail next to a hand-built one ever disturbs the
+      hand-built one's own shape via an engine-level neighbor update (§48.6/§48.10).
+
 ## ⚠️ Order Note (Pre-Prompt-18 Bug-Fix Pass)
 Uploaded with four specific bug reports and four screenshots, explicitly instructing
 "DO NOT START PROJECT PROMPT 18 YET." Honored — Project Prompt 18 was not started.
@@ -472,16 +496,16 @@ broken, the packaging fix (bugfix session) and the `.mcaddon` import itself rema
 right place to start ruling things out first, since nothing else can be verified until
 that works.
 
-## Up Next — Roadmap Phase 19+ (not started)
-(Per Project Prompt 18's own scope limit: no new building modes, no depth/height
-increases, no decorative bridge styles, no undo, no UI redesign this session. See
-ROADMAP.md's Phase 19+ backlog, still including underground tunnel lighting —
-ARCHITECTURE.md §45.12 flagged the finished tunnel as dark and mob-spawn-capable — plus
-two water-specific follow-ups noted in ARCHITECTURE.md §47.10: sealing Underground's
-best-effort landing buffer against water too, and a wider waterproof shell for large
-aquifer pockets if in-game testing shows the current thin lateral seal is ever
-insufficient. Project Prompt 19 itself, whenever it arrives, is milestone-gated on your
-test pass of this session, per the project's standing workflow.)
+## Up Next — Roadmap Phase 20+ (not started)
+(Per Project Prompt 19's own scope limit: no new building modes, no blueprint/undo, no
+UI redesign, no automatic Normal/Bridge/Underground switching this session. See
+ROADMAP.md's Phase 20+ backlog, still including underground tunnel lighting —
+ARCHITECTURE.md §45.12 — the two water-specific follow-ups noted in ARCHITECTURE.md
+§47.10, and now also a `@minecraft/server-ui` test mock so `ui/BuildMenu.js` can
+finally be covered (§48.10). Project Prompt 20 itself, whenever it arrives, is
+milestone-gated on your test pass of this session, per the project's standing
+workflow — including the one thing this session's tests cannot confirm: neighbor-update
+side effects on a pre-existing rail (§48.6).)
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.
@@ -489,13 +513,15 @@ The checklist that used to live under this heading now lives under Phase 16, whe
 actual bridge engine has now been built. Heading kept, body intentionally emptied, for
 session-history continuity — not a second, duplicate copy of the same checklist.)
 
-## Backlog (Roadmap Phase 19+, not scheduled yet)
+## Backlog (Roadmap Phase 20+, not scheduled yet)
 - [ ] Curved rail placement (extends `RailPermutationBuilder.js`, per its own design notes)
 - [x] ~~Underwater railways~~ — done, Roadmap Phase 18 (Project Prompt 18). See
       ARCHITECTURE.md §47.
 - [ ] Sealing Underground Mode's best-effort landing buffer against water (currently
       just omitted when unsafe — ARCHITECTURE.md §47.10)
 - [ ] A wider (non-lateral-only) waterproof shell for large aquifer pockets, if needed
+- [ ] A `@minecraft/server-ui` test mock so `ui/BuildMenu.js` can be covered by an
+      automated test (ARCHITECTURE.md §48.10)
 - [ ] Undo system
 - [ ] Railway blueprint save/load
 - [ ] Railway templates
