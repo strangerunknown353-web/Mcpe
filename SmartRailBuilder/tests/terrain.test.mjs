@@ -362,6 +362,19 @@ for (const railTypeId of ["minecraft:rail", "minecraft:golden_rail", "minecraft:
   assertEqual(plan.deckPositions[plan.deckPositions.length - 1].position.y, 64, "bridge ends flat back at the origin elevation");
   assertEqual(plan.deckPositions[0].slopeDirection, null, "bridge's starting rail is flat, not sloped");
   assertTrue(new BridgeValidation().validate(plan).valid, "bridge transition: passes its own elevation-profile consistency check");
+
+  // Project Prompt 25 §3/§4: direct regression proof that BOTH ends of the
+  // bridge actually anchor to real ground, not just at the documented
+  // "index 0 and index length-1 are always piers" claim — the deck here
+  // (y=64) sits 4 blocks above natural ground (groundY=60), so a genuine
+  // support column must exist reaching down toward it at both the starting
+  // and ending column, or either end would be a floating bridge instead of
+  // a clean transition from/to terrain.
+  const startColumn = plan.supportPositions.filter((p) => p.x === plan.deckPositions[0].position.x && p.z === plan.deckPositions[0].position.z);
+  const lastDeck = plan.deckPositions[plan.deckPositions.length - 1].position;
+  const endColumn = plan.supportPositions.filter((p) => p.x === lastDeck.x && p.z === lastDeck.z);
+  assertTrue(startColumn.length > 0, "bridge transition: the starting pier has a real support column reaching toward the ground");
+  assertTrue(endColumn.length > 0, "bridge transition: the ending pier has a real support column reaching toward the ground, not a floating landing");
 }
 
 {
@@ -379,6 +392,25 @@ for (const railTypeId of ["minecraft:rail", "minecraft:golden_rail", "minecraft:
   assertEqual(plan.railSteps[1].position.y, originY - 1, "underground's second position is exactly one block lower, a real ramp");
   assertEqual(plan.railSteps[0].slopeDirection !== null, true, "underground's first rail is sloped (descending), not a vertical shaft");
   assertTrue(new UndergroundValidation().validate(plan).valid, "underground transition: passes its own elevation-profile consistency check");
+}
+
+{
+  // Project Prompt 25 §9/§11: direct regression proof for the historically
+  // reported "tunnel ends in a one-block space the player can't pass
+  // through" bug (bugfix pass before Project Prompt 18, ARCHITECTURE.md
+  // §46.3) — no existing test asserted on `landingExcavationPositions` by
+  // name before this session. With ordinary, breakable terrain past the
+  // last requested rail, the terminal landing buffer must actually be
+  // populated (a real landing pocket), not silently empty.
+  const dim = createMockDimension({ groundY: 100 });
+  const plan = scanner.planUnderground(createBuildVector({ x: 0, y: 70, z: 0 }, "east"), 8, dim, 5);
+  assertTrue(plan.feasible, "underground exit: plan feasible");
+  assertTrue(plan.landingExcavationPositions.length > 0, "underground exit: a real landing buffer is excavated past the last rail, not a flush wall");
+  assertEqual(
+    plan.landingExcavationPositions.length,
+    plan.tunnelHeight,
+    "underground exit: the landing buffer clears a full column, matching ordinary tunnel clearance"
+  );
 }
 
 // ---------------------------------------------------------------------------

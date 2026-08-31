@@ -1224,7 +1224,40 @@ modes at their boundary values, steep-terrain rejection, an underwater tunnel, l
 an existing railway and structure, resource behavior, cancellation, a long build, and
 multiplayer.
 
-## Phase 25+ — Reserved for Future Features (planned only when reached)
+## Phase 25 — Professional Railway Construction & Feature Integration (Project Prompt 25) — COMPLETE (awaiting in-game confirmation)
+
+Status: a construction-quality review demanding evidence, not re-assertion. Every numbered
+requirement (§1-§22) was checked against the real code; no new bugs were found — bridge
+landing/anchoring, tunnel entrance/exit, resource transactions, cancellation, and rail
+preservation were all already correct, hardened across 24 prior sessions. What this session
+found instead were five real, previously-UNPROVEN claims — things the code already did
+correctly but that no test had ever directly verified by name — and closed each with a
+genuine, empirically-checked test: the Underground tunnel's terminal landing buffer
+(historically the "one-block space that cannot be passed through" bug) is now proven
+non-empty for an ordinary build, not just documented as fixed; both bridge endpoints are now
+proven to have a real support column reaching toward the ground, not just a doc claim about
+pier indices; a full BRIDGE and UNDERGROUND pipeline run now checks the ACTUAL constructed
+world against `context.buildPlan`'s own position lists (every rail position really holds a
+rail, every support position really holds the chosen material, every excavated position was
+really cleared) — the literal "does construction match the BuildPlan" check Project Prompt 25
+§15 asked for; and a new full-pipeline test proves a held POWERED rail survives an entire
+Bridge build end to end, never silently substituted with plain rail — every prior
+full-pipeline test had only ever used the default rail type. No production code in
+`BP/scripts/` changed this session — every one of these five tests passed against the
+UNMODIFIED code on the first correctly-constructed attempt. See ARCHITECTURE.md §54 for the
+complete write-up, including confirmation (with the exact mechanism, not silently skipped)
+for every other requirement in the checklist. **A new, testable `.mcaddon` was packaged and
+delivered this session** — version 0.1.18. 356 assertions across 8 test files, all passing;
+`node --check` clean across 79 script files.
+
+### Phase 25 Manual Testing Checklist
+See this session's final report (delivered alongside the `.mcaddon`) for the complete,
+numbered 30-item Minecraft PE testing checklist covering all three modes at their boundary
+values, all four rail types, an underwater tunnel, lava safety, an existing railway crossing,
+resource behavior, cancellation, a long build, two-player simultaneous construction, and
+repeated builds.
+
+## Phase 26+ — Reserved for Future Features (planned only when reached)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is
 currently dark and will spawn mobs; worth a deliberate decision) · cave-floor filling for
 Underground Mode (BridgeSupportBuilder is the natural reuse) · curved rails · undo

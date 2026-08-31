@@ -1291,3 +1291,44 @@ consecutive session on a base that has still never been confirmed in-game — se
 - **Not yet confirmed in-game** — this session's own instructions were explicit that
   claiming otherwise without an actual Minecraft launch would be dishonest; none of
   this project's 24 sessions has been play-tested by a human.
+
+### Project Prompt 25 — Professional Railway Construction & Feature Integration — 2026-08-31
+
+- **No production code changed.** A construction-quality audit against the full §1-§22
+  checklist found no new bugs — everything asked for was already correct, built across 24
+  prior sessions. Five real test-coverage gaps were closed instead, each empirically proving
+  a claim this project's own docs had only ever asserted, not verified by name.
+- **Added: a direct regression proof for the Underground tunnel's terminal landing buffer**
+  (the historically-reported "one-block space that cannot be passed through" bug) — an
+  ordinary build now asserts `landingExcavationPositions` is genuinely non-empty and matches
+  full tunnel clearance, not just documented as fixed. ARCHITECTURE.md §54.2.
+- **Added: a direct regression proof that both bridge endpoints anchor to real ground** — a
+  bridge whose deck sits well above natural terrain now asserts a real support column exists
+  at both the starting and ending pier column, not just at "some point along the crossing."
+  ARCHITECTURE.md §54.3.
+- **Added: post-construction verification that the actual world matches `context.buildPlan`**
+  for full BRIDGE and UNDERGROUND pipeline runs — every rail position holds a rail, every
+  bridge support/surface position holds the chosen material, every excavated position was
+  actually cleared. Scoped entirely to the plan's own position lists, no full-world scan.
+  ARCHITECTURE.md §54.4.
+- **Added: a full-pipeline rail-type-preservation proof** — a complete BRIDGE build holding a
+  powered rail (`minecraft:golden_rail`) confirms every placed rail is genuinely the held
+  type, never silently substituted with plain rail; every prior full-pipeline test had only
+  ever used the default rail type. ARCHITECTURE.md §54.5.
+- **Confirmed sound, not rewritten** (reviewed against the full checklist, only real findings
+  acted on): construction quality/no duplicate rails, all terrain transitions, bridge material
+  consistency, bridge supports over uneven terrain/water, lava safety, existing-rail
+  preservation, resource transactions, partial-build policy, multiplayer isolation,
+  performance, error handling, and UI. ARCHITECTURE.md §54.6.
+- **Files modified:** `tests/terrain.test.mjs` (+5 assertions), `tests/integration.test.mjs`
+  (+8 assertions), `tests/README.md`, `config/Constants.js` + both manifests (version
+  0.1.17 → 0.1.18).
+- **Packaged a new, testable `.mcaddon`** — version 0.1.18, structure verified (manifests
+  valid, all three version references agree, both `.mcpack` archives correctly rooted,
+  `.mcaddon` contains exactly the 2 expected `.mcpack` files).
+- **Validation:** 356 assertions across 8 test files (343 unchanged + 13 new), all passing.
+  `node --check` clean across all 79 script files (unchanged — no production code touched).
+  Full detail in ARCHITECTURE.md §54.8.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of
+  this project's 25 sessions has been play-tested by a human.

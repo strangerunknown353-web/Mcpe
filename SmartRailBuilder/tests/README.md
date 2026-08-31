@@ -225,6 +225,27 @@ specifics no prior suite exercised:
   since it's exactly the kind of test-authoring mistake worth naming, not
   smoothing over.
 
+**Project Prompt 25 additions** (no new file — extended `terrain.test.mjs` and
+`integration.test.mjs` directly, closing real coverage gaps the session's own
+construction-quality checklist called out):
+- `terrain.test.mjs`: the Underground tunnel's terminal landing buffer
+  (`landingExcavationPositions`) is actually populated for an ordinary build
+  — direct regression proof for the historically-reported "tunnel ends in a
+  one-block space" bug, never asserted on by name before this session; and
+  both bridge endpoints (index 0 and index length-1) genuinely have a real
+  support column reaching toward the ground, not just a documented claim.
+- `integration.test.mjs`: after a full BRIDGE/UNDERGROUND pipeline run, the
+  actual world is checked against `context.buildPlan`'s own position lists
+  (every rail position really holds a rail, every bridge support/surface
+  position really holds the chosen material, every excavated position was
+  really cleared) — the "does construction match the plan" verification
+  Project Prompt 25 §15 asked for, scoped to the plan's own positions only
+  (no full-world scan); and a new full-pipeline BRIDGE build using a
+  DIFFERENT held rail type (powered rail) proves terrain adaptation and
+  bridge construction place the actually-held type end to end, never
+  silently defaulting to plain rail — every prior full-pipeline test only
+  ever used `"minecraft:rail"`.
+
 `structureProtection.test.mjs` (Project Prompt 24) — the new player-structure
 protection (`config/UnbreakableBlockRegistry.js`'s `PROTECTED_STRUCTURE_BLOCK_IDS`):
 a chest at the rail's own spot (NORMAL), inside an excavation volume

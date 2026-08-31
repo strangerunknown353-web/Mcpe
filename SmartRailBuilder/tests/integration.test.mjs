@@ -234,6 +234,19 @@ function stubBuildMenu({ mode = "NORMAL", modeValue, length = 5, materialId, con
   assertEqual(context.request.bridgeHeight, 3, "full BRIDGE pipeline: bridgeHeight carried through the whole request");
   assertEqual(context.request.bridgeMaterialId, "minecraft:cobblestone", "full BRIDGE pipeline: chosen material carried through");
   assertTrue(context.buildSession.blocksPlaced > 0, "full BRIDGE pipeline: blocks actually placed");
+
+  // Project Prompt 25 §15: verify the actual world matches context.buildPlan
+  // — the relevant construction area only (the plan's own already-computed
+  // position lists), not an expensive full-world scan.
+  const plan = context.buildPlan;
+  assertTrue(
+    plan.railPositions.every((p) => dim.getBlock(p).typeId === "minecraft:rail"),
+    "full BRIDGE pipeline: every planned rail position actually holds a rail in the world"
+  );
+  assertTrue(
+    plan.bridgeSupportPositions.every((p) => dim.getBlock(p).typeId === "minecraft:cobblestone"),
+    "full BRIDGE pipeline: every planned support/surface position actually holds the chosen material, not something else"
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -257,6 +270,60 @@ function stubBuildMenu({ mode = "NORMAL", modeValue, length = 5, materialId, con
   assertEqual(result.status, PipelineResultStatus.SUCCESS, "full UNDERGROUND pipeline: SUCCESS end to end (Creative)");
   assertEqual(context.request.undergroundDepth, 5, "full UNDERGROUND pipeline: undergroundDepth carried through");
   assertEqual(context.buildSession.blocksPlaced, 8, "full UNDERGROUND pipeline: all 8 rails placed");
+
+  // Project Prompt 25 §15: verify the actual world matches context.buildPlan
+  // for the relevant construction area only.
+  const plan = context.buildPlan;
+  assertTrue(
+    plan.railPositions.every((p) => dim.getBlock(p).typeId === "minecraft:rail"),
+    "full UNDERGROUND pipeline: every planned rail position actually holds a rail in the world"
+  );
+  const railKeys = new Set(plan.railPositions.map((p) => `${p.x},${p.y},${p.z}`));
+  const excavatedOnly = plan.tunnelPositions.filter((p) => !railKeys.has(`${p.x},${p.y},${p.z}`));
+  assertTrue(excavatedOnly.length > 0, "full UNDERGROUND pipeline: there are excavation-only positions to check (headroom, not just rail spots)");
+  assertTrue(
+    excavatedOnly.every((p) => dim.getBlock(p).typeId !== "minecraft:stone"),
+    "full UNDERGROUND pipeline: every excavated (non-rail) position was actually cleared, not left as solid stone"
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 3b. Rail type preservation (Project Prompt 25 §14): every full-pipeline
+//     test above used plain "minecraft:rail" — this one holds a DIFFERENT
+//     rail type (powered rail) through a whole BRIDGE build, proving
+//     terrain adaptation and bridge construction place the actually-held
+//     type end to end, never silently defaulting to plain rail.
+// ---------------------------------------------------------------------------
+
+{
+  const dim = createMockDimension({ groundY: 60 });
+  const player = createMockPlayer({
+    id: "p3b",
+    gameMode: "Survival",
+    heldItemTypeId: "minecraft:golden_rail",
+    items: [
+      { typeId: "minecraft:golden_rail", amount: 20 },
+      { typeId: "minecraft:cobblestone", amount: 20 },
+    ],
+    location: { x: 0, y: 64, z: 0 },
+    dimension: dim,
+  });
+
+  const { pipeline } = buildRealDependencyGraph(
+    stubBuildMenu({ mode: "BRIDGE", modeValue: 3, length: 9, materialId: "minecraft:cobblestone" })
+  );
+  const context = new PipelineContext({ player, railTypeId: "minecraft:golden_rail" });
+  const result = await pipeline.run(context);
+
+  assertEqual(result.status, PipelineResultStatus.SUCCESS, "rail type preservation: golden rail BRIDGE build succeeds");
+  assertTrue(
+    context.buildPlan.railPositions.every((p) => dim.getBlock(p).typeId === "minecraft:golden_rail"),
+    "rail type preservation: every placed rail is the actually-held powered rail, not plain rail"
+  );
+  assertTrue(
+    context.buildPlan.railPositions.every((p) => dim.getBlock(p).typeId !== "minecraft:rail"),
+    "rail type preservation: terrain adaptation/bridge construction never silently substituted plain rail"
+  );
 }
 
 // ---------------------------------------------------------------------------

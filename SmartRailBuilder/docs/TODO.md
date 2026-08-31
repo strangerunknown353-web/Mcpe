@@ -639,6 +639,29 @@ genuine regression evidence, just not a re-run of the original files byte-for-by
       distinguished from natural terrain — only specific block types and existing rails are
       reliably protected. Every other standing limitation from prior sessions is unchanged.
 
+## Completed — Roadmap Phase 25: Professional Railway Construction & Feature Integration ✅
+- [x] **No production code changed** — a construction-quality audit against the full §1-§22
+      checklist found no new bugs; everything asked for was already correct.
+- [x] **Added a direct proof for the Underground landing buffer** (the historically-reported
+      "one-block space" bug) — now empirically non-empty, not just documented as fixed. §54.2.
+- [x] **Added a direct proof that both bridge endpoints anchor to real ground** — a real
+      support column confirmed at both the starting and ending pier column. §54.3.
+- [x] **Added post-construction world-vs-BuildPlan verification** for full BRIDGE/UNDERGROUND
+      pipeline runs — every rail/support/excavated position checked against the actual world,
+      scoped to the plan's own positions only. §54.4.
+- [x] **Added a full-pipeline rail-type-preservation proof** — a powered rail survives an
+      entire Bridge build end to end, never silently substituted with plain rail. §54.5.
+- [x] **Confirmed sound, not rewritten**: construction quality, all transitions, bridge
+      material consistency, supports over uneven terrain/water, lava safety, existing-rail
+      preservation, resource transactions, partial-build policy, multiplayer, performance,
+      error handling, and UI. §54.6.
+- [x] 356 assertions across 8 test files, all passing. `node --check` clean across 79
+      script files (unchanged — no production code touched).
+- [x] **New `.mcaddon` packaged, version 0.1.18** — structure verified.
+- [ ] **Awaiting your in-game test pass** — full numbered checklist delivered alongside the
+      `.mcaddon` in this session's final report. Every standing limitation from prior
+      sessions (§54.7) is unchanged — nothing new added this session.
+
 ## ⚠️ Order Note (Pre-Prompt-18 Bug-Fix Pass)
 Uploaded with four specific bug reports and four screenshots, explicitly instructing
 "DO NOT START PROJECT PROMPT 18 YET." Honored — Project Prompt 18 was not started.
@@ -652,20 +675,18 @@ broken, the packaging fix (bugfix session) and the `.mcaddon` import itself rema
 right place to start ruling things out first, since nothing else can be verified until
 that works.
 
-## Up Next — Roadmap Phase 25+ (not started)
-Per Project Prompt 24's own scope limit (routing-quality review, no pathfinding, no
-mode-switching), the backlog is unchanged from before this session except that
-`PROTECTED_STRUCTURE_BLOCK_IDS` may want new entries if in-game testing surfaces a common
-player-placed block type this session's list missed. See ROADMAP.md's Phase 25+ backlog:
-underground tunnel lighting (ARCHITECTURE.md §45.12), the two water-specific follow-ups
-(ARCHITECTURE.md §47.10), curved rails, undo, blueprint save/load, raising
-`LENGTH_PRESETS.MAX_SURVIVAL` past 64, and the rest. Project Prompt 25 itself, whenever it
-arrives, is milestone-gated on your test pass of THIS session, per the project's standing
-workflow — including the items no session's tests can confirm without a live client:
-neighbor-update side effects on a pre-existing rail (§48.6), the two `ui/BuildMenu.js`
-visual-confirmation items (§50.11), `player.dimension`/`Dimension.id` (§51.13), and the new
-"ordinary-block player structures can't be detected" limitation (§53.7) — none of them
-touched or added to this session beyond the last.
+## Up Next — Roadmap Phase 26+ (not started)
+Per Project Prompt 25's own scope limit (construction-quality audit, no unrelated features),
+the backlog is entirely unchanged from before this session — no new code, no new limitations.
+See ROADMAP.md's Phase 26+ backlog: underground tunnel lighting (ARCHITECTURE.md §45.12), the
+two water-specific follow-ups (ARCHITECTURE.md §47.10), curved rails, undo, blueprint
+save/load, raising `LENGTH_PRESETS.MAX_SURVIVAL` past 64, and the rest. Project Prompt 26
+itself, whenever it arrives, is milestone-gated on your test pass of THIS session, per the
+project's standing workflow — including the items no session's tests can confirm without a
+live client: neighbor-update side effects on a pre-existing rail (§48.6), the two
+`ui/BuildMenu.js` visual-confirmation items (§50.11), `player.dimension`/`Dimension.id`
+(§51.13), and "ordinary-block player structures can't be detected" (§53.7) — none of them
+touched this session.
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.
@@ -673,7 +694,7 @@ The checklist that used to live under this heading now lives under Phase 16, whe
 actual bridge engine has now been built. Heading kept, body intentionally emptied, for
 session-history continuity — not a second, duplicate copy of the same checklist.)
 
-## Backlog (Roadmap Phase 25+, not scheduled yet)
+## Backlog (Roadmap Phase 26+, not scheduled yet)
 - [ ] Curved rail placement (extends `RailPermutationBuilder.js`, per its own design notes)
 - [x] ~~Underwater railways~~ — done, Roadmap Phase 18 (Project Prompt 18). See
       ARCHITECTURE.md §47.

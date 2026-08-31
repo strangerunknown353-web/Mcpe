@@ -5213,3 +5213,140 @@ in the terrain logic itself.
   across any of its now-24 sessions. This session's own instructions were explicit that
   claiming otherwise would be dishonest; every "Validation Performed" section in this document,
   across every prior session, has said the same thing for the same reason.
+
+## 54. Professional Railway Construction & Feature Integration (Roadmap Phase 25, Project Prompt 25)
+
+### 54.1 — Scope: Prove Construction Quality With Evidence, Not Just Re-Assert It
+
+This session's brief was construction QUALITY — the actual generated railway looking and
+behaving like something a player intentionally built. Reviewing every numbered requirement
+(§1-§22) against the real code found NO new bugs: bridge landing/anchoring, tunnel
+entrance/exit, resource transactions, cancellation, and rail preservation were all already
+correct, built and hardened across 24 prior sessions. What this session found instead were
+FIVE real, previously-unproven claims — things the code already did correctly but that no
+test had ever directly verified by name. Each was closed with a genuine, empirically-checked
+test (not assumed from a similar case), and every one passed against the real, UNMODIFIED
+production code on the first correctly-constructed attempt — meaning this session's own
+"evidence, not assertion" standard actually confirmed the code, rather than exposing a defect
+that needed fixing. No production code in `BP/scripts/` changed this session.
+
+### 54.2 — Closed: Underground Exit Landing Buffer, Proven By Name for the First Time (§9/§11)
+
+Project Prompt 25 §9 explicitly restates: "The previously observed 'one-block space that
+cannot be passed through' MUST remain fixed" — this refers to the terminal landing buffer
+(`UndergroundPlan.landingExcavationPositions`, added in the bugfix pass before Project Prompt
+18, see ARCHITECTURE.md §46.3). Auditing the existing test suites found this field had never
+once been asserted on by name — its correctness rested entirely on the original bugfix
+session's own manual reasoning, never re-verified since. A new test in `tests/terrain.test.mjs`
+now directly proves an ordinary underground build (clear, breakable terrain past the last
+rail) produces a real, non-empty landing buffer matching the tunnel's own clearance height —
+this is the single most direct regression guard this specific historically-reported bug could
+have, and it passed against the unmodified code.
+
+### 54.3 — Closed: Bridge Endpoint Anchoring, Proven By Name for the First Time (§3/§4)
+
+`TerrainScanner.planBridge()`'s pier selection (`isPier = i === 0 || i === length - 1 || i %
+PIER_SPACING === 0`, unchanged since the bugfix pass before Project Prompt 18) guarantees both
+ends of every bridge get a full support column reaching toward real ground — but no existing
+test asserted this for the ENDPOINTS specifically, only that piers exist somewhere along a
+water crossing. A new test confirms, for a bridge whose deck sits well above natural ground,
+that `supportPositions` genuinely contains entries at both the starting and ending column —
+direct proof neither end is a floating landing, closing exactly the "bridge should transition
+naturally from the ground" / "connect cleanly back to terrain" requirements (§3/§5) with
+evidence instead of a doc citation.
+
+### 54.4 — Closed: Construction Actually Matches BuildPlan (§15)
+
+Every prior full-pipeline test (`tests/integration.test.mjs`) checked that SOME blocks were
+placed and that session/request bookkeeping was correct, but never read back the actual placed
+world and compared it against `context.buildPlan`'s own position lists — the literal "does the
+final world correspond to the BuildPlan" verification §15 asks for. Added to the existing
+BRIDGE and UNDERGROUND full-pipeline tests: every `railPositions` entry actually holds a rail;
+every `bridgeSupportPositions` entry actually holds the chosen material (not something else);
+every excavated (non-rail) Underground position was actually cleared, not left as solid stone.
+Scoped entirely to `buildPlan`'s own already-computed position lists — no full-world scan, per
+§15's own "do not perform an expensive full-world verification" instruction.
+
+### 54.5 — Closed: Rail Type Preservation Through a Full Bridge Build (§14)
+
+Every prior full-pipeline test used the default `"minecraft:rail"` — none proved that holding
+a DIFFERENT rail type (powered/detector/activator) survives terrain adaptation and mode-specific
+construction end to end, only that individual strategy methods handle an arbitrary type ID
+correctly in isolation (`execution.test.mjs`). A new full-pipeline test holds
+`"minecraft:golden_rail"` (powered rail) through a complete BRIDGE build and confirms every
+placed rail position is genuinely golden rail — never silently substituted with plain rail
+anywhere in the ramp/crest/descent geometry.
+
+### 54.6 — Confirmed Sound, Not Rewritten: Everything Else (§1-§2, §6-§8, §10, §12-§13, §16-§21)
+
+- **Construction quality / no duplicate rails / no cross corruption (§1)**: `RAIL_ITEM_ID_SET`
+  preservation, unchanged since Project Prompt 19, re-verified via the full, unmodified
+  regression suite (39/39 `execution.test.mjs` assertions passing, including its own
+  cross/intersection tests).
+- **Transitions (§2)**: flat/slope/bridge/underground transitions were already covered
+  end-to-end by Project Prompt 24's own new tests (§53.3) plus the pre-existing suite —
+  nothing new needed this session beyond §54.2/§54.3's endpoint-specific proofs.
+- **Bridge material consistency (§4/§6)**: `session.bridgeMaterialId` (the player's own
+  choice) is the single value read by every support/surface/rail placement call in
+  `BridgeExecutionStrategy` — confirmed by direct code read, now also empirically confirmed
+  by §54.4's world-vs-plan material check.
+- **Bridge supports over uneven terrain/water (§7/§8)**: lightweight piers, `SUPPORT_UNAVAILABLE`/
+  `SUPPORT_HAZARD` rejecting rather than ever producing a floating support — unchanged since
+  the bugfix pass before Project Prompt 18, re-confirmed via `water.test.mjs`'s existing pier
+  test (55/55 passing).
+- **Lava safety (§10)**: unchanged since Project Prompt 12/18 — hazard check always wins first,
+  before any excavation.
+- **Existing rails / rail type preservation (§13/§14)**: re-tested via the full regression
+  suite (unchanged) plus §54.5's new full-pipeline proof.
+- **Resource transactions / partial build policy (§16/§17)**: deduction strictly after
+  placement, never on menu-open, interrupted builds keep what's placed and stop — unchanged
+  since Project Prompt 2/10, re-verified via `buildPlanSafety.test.mjs`/
+  `performanceStability.test.mjs` (both unchanged, still passing).
+- **Multiplayer (§18)**: independent `BuildPlan`/inventory/progress/cancellation per player,
+  conflicting builds rejected via `ActiveBuildRegistry` — unchanged since Project Prompt 22,
+  re-verified via the existing 3-player load test (`performanceStability.test.mjs`).
+- **Performance (§19)**: nothing routing- or construction-adjacent changed this session, so
+  Project Prompt 23's own direct measurements (§52.9) still apply unchanged — no new
+  measurement taken since no performance-relevant code path was touched.
+- **Error handling (§20)**: every listed failure path (invalid terrain, invalid height/depth,
+  insufficient resources, lava, water, unbreakable block, existing-railway conflict,
+  disconnect, death, cancellation, dimension change) already has a dedicated, tested rejection
+  path across Project Prompts 18-24 — re-confirmed via the full regression suite, not
+  re-implemented.
+- **UI (§21)**: Project Prompt 21 already covers Rail Type/Mode/Length/Height-Depth/Material/
+  Required Resources/Validation Status/Build-Cancel with consistent terminology — no further
+  polish needed or attempted this session, per §21's own "do a SMALL polish pass ONLY where
+  necessary."
+
+### 54.7 — Known Limitations (disclosed, not hidden, carried forward from prior sessions)
+
+- Every limitation from §53.7 remains unchanged: a player structure built from ORDINARY blocks
+  still can't be distinguished from natural terrain (only the curated block list and existing
+  rails are reliably protected); `player.dimension`/`Dimension.id` is still unconfirmed API
+  surface; the two `ui/BuildMenu.js` visual-confirmation items and neighbor-update side effects
+  on a pre-existing rail remain unconfirmable without a live client; the build-length ceiling
+  is still 64.
+- **No in-game verification for anything in this or any prior session.** Every claim above is a
+  Node-only, mocked-world verification — see §54.8 and the Minecraft PE test checklist
+  delivered alongside this session's `.mcaddon`.
+
+### 54.8 — Validation Performed
+
+- `node --check` across all 79 script files — 0 failures (no production code changed this
+  session; only test files were added to).
+- **356 assertions across 8 test files, all passing**: 55 (`water.test.mjs`, unchanged), 39
+  (`execution.test.mjs`, unchanged), 59 (`buildPlanSafety.test.mjs`, unchanged), 44
+  (`performanceStability.test.mjs`, unchanged), 14 (`structureProtection.test.mjs`, unchanged),
+  83 (`terrain.test.mjs`, +5 new: landing buffer + bridge endpoint anchoring), and 37
+  (`integration.test.mjs`, +8 new: plan-vs-world verification for BRIDGE/UNDERGROUND, plus a
+  new full-pipeline rail-type-preservation test).
+- `LocalizationKeys`↔`RP/texts/en_US.lang` cross-check: 0 missing, 0 orphaned keys (no
+  player-facing strings changed this session).
+- The addon's `.mcaddon` was rebuilt and its internal structure verified (manifests parse as
+  valid JSON, all three version fields agree at 0.1.18, both `.mcpack` archives contain a
+  `manifest.json` at their own root, the outer `.mcaddon` contains exactly the two `.mcpack`
+  files) — see the delivered file and this session's final report for the exact result.
+- **Not yet confirmed in-game** — nothing in this project has been play-tested by a human
+  across any of its now-25 sessions. This session's own instructions were explicit that
+  claiming otherwise would be dishonest; every "Validation Performed" section in this document,
+  across every prior session, has said the same thing for the same reason.
