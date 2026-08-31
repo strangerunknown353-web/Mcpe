@@ -35,20 +35,59 @@ class MockContainer {
   }
 }
 
-export function createMockPlayer({ id, name = id, gameMode = "Survival", heldItemTypeId, items = [] } = {}) {
+export function createMockPlayer({
+  id,
+  name = id,
+  gameMode = "Survival",
+  heldItemTypeId,
+  items = [],
+  location = { x: 0, y: 64, z: 0 },
+  rotation = { x: 0, y: 0 },
+  dimension,
+  isValid = true,
+} = {}) {
   const container = new MockContainer();
   for (const { typeId, amount } of items) {
     container.addItem(typeId, amount);
   }
 
   let currentGameMode = gameMode;
+  // Added Project Prompt 20 (full-pipeline integration test): every message
+  // MessageService sends is recorded here rather than silently swallowed —
+  // MessageService already catches a missing sendMessage/onScreenDisplay
+  // gracefully (confirmed: earlier drafts of this test ran fine without
+  // this, just noisily, since that's exactly the "player disconnected mid-send"
+  // resilience it's designed for), but a real mock lets tests assert on
+  // what was actually said, and keeps test output readable.
+  const sentChatMessages = [];
+  const sentActionBarMessages = [];
 
   return {
     id,
     name,
-    location: { x: 0, y: 64, z: 0 },
+    // Added Project Prompt 20 (full-pipeline integration test): PlayerValidator
+    // reads this directly ("has the player disconnected between the menu
+    // opening and this validation running") — every prior test bypassed
+    // ValidationManager entirely, so this was never previously needed.
+    isValid,
+    // Added Project Prompt 20: BuildRequestCreationStage reads
+    // `player.dimension` directly when constructing a BuildRequest.
+    dimension,
+    location,
+    /** TEST-ONLY: every {translate, with} payload sent via sendMessage(), in order. */
+    sentChatMessages,
+    /** TEST-ONLY: every {translate, with} payload sent via onScreenDisplay.setActionBar(), in order. */
+    sentActionBarMessages,
+    sendMessage(rawMessage) {
+      sentChatMessages.push(rawMessage);
+    },
+    onScreenDisplay: {
+      setActionBar(rawMessage) {
+        sentActionBarMessages.push(rawMessage);
+      },
+    },
     getRotation() {
-      return { x: 0, y: 0 };
+      return rotation;
     },
     getGameMode() {
       return currentGameMode;

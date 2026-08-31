@@ -1018,3 +1018,49 @@ consecutive session on a base that has still never been confirmed in-game — se
   detail, including the real bugs this process found and fixed (in both the shipped
   code and the test harness itself) before being trusted, in ARCHITECTURE.md §48.11.
 - **Not yet confirmed in-game.**
+
+### Project Prompt 20 — Pre-Prompt-21 Integration Test (Full Integration, Stability & Real-World Test Build)
+- **Full architecture/integration review, no new features.** Read every remaining
+  script file in the addon not already reviewed by Project Prompts 18-19 — `main.js`'s
+  dependency graph, `BuildPipeline.js`, every pipeline stage, every validator,
+  `ui/BuildMenu.js`, the tunnel-detection subsystem, and every small utility file.
+  Confirmed the pipeline wiring (`RailDetectionStage` → ... → `CompletionStage`)
+  matches the architecture exactly — no stage bypasses its role, no module boundary
+  needed moving. ARCHITECTURE.md §49.1/§49.3.
+- **Fixed: `TunnelPlanner.js`'s `TerrainPositionFact` was missing 3 fields**
+  (`isExistingRail`/`isUnderwater`/`waterInfo`) added to the OTHER fact-producer
+  (`TerrainScanner._scanPosition()`) across Project Prompts 18-19 — harmless in
+  practice, but a real shape inconsistency between the codebase's two producers of
+  this type. Fixed, with a new regression test. ARCHITECTURE.md §49.2.
+- **Fixed: a stale doc comment** in `RequestLifecycleState.js` (`COMPLETED` marked "not
+  reachable" for ten sessions after it became reachable in Project Prompt 10) and
+  **removed `utils/NotImplemented.js`**, confirmed fully dead code (zero remaining call
+  sites — every stub it was written for has been implemented since Project Prompt 3).
+  ARCHITECTURE.md §49.2.
+- **Added: `tests/integration.test.mjs`** — builds the exact same dependency graph
+  `main.js` constructs and runs the real `BuildPipeline` end to end (NORMAL/BRIDGE/
+  UNDERGROUND builds, 4 rejection paths, a 2-player multiplayer scenario), with only
+  `ui/BuildMenu.js` substituted for a scripted stub. The first test in this project to
+  verify the WIRING itself, not just individual pieces. Two real bugs in the test's own
+  first draft (wrong assumed block coordinates; under-provisioned mock terrain/
+  inventory) were found and fixed before being trusted. ARCHITECTURE.md §49.4.
+- **UI and error-message review**: `ui/BuildMenu.js`'s full 4-screen flow and every
+  player-facing rejection message re-read against `en_US.lang` — confirmed plain-
+  language, no stray unfilled placeholders, 0 missing/orphaned localization keys.
+  ARCHITECTURE.md §49.7.
+- **Files created:** `tests/integration.test.mjs`.
+- **Files modified:** `terrain/TunnelPlanner.js` (fact-shape fix),
+  `core/pipeline/RequestLifecycleState.js` (stale comment fix), `tests/mockPlayer.mjs`
+  (`isValid`/`dimension`/`sendMessage`/`onScreenDisplay` support for full-pipeline
+  testing), `tests/terrain.test.mjs` (new regression assertions), `config/Constants.js`
+  + both manifests (version 0.1.12 → 0.1.13).
+- **Files removed:** `utils/NotImplemented.js` (dead code).
+- **Packaged a new, testable `.mcaddon`** — version 0.1.13, structure verified
+  (manifests valid, both `.mcpack` archives correctly rooted, `.mcaddon` contains
+  exactly the 2 expected `.mcpack` files).
+- **Validation:** 191 assertions across 4 test files (55 + 68 + 39 unchanged/incremented,
+  29 new), all passing. `node --check` clean across every script file (73, one fewer
+  than before this session). Full detail in ARCHITECTURE.md §49.9.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of
+  this project's 20 sessions has been play-tested by a human.

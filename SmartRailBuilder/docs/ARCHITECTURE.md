@@ -4272,3 +4272,171 @@ no new conflict-resolution code was needed or added.
   continuation) were found by running them and fixed before being trusted — full
   honest accounting rather than silently rewriting the expectation without noting why.
 - **Not yet confirmed in-game.**
+
+## 49. Pre-Prompt-21 Integration Test (Roadmap Phase 20, Project Prompt 20)
+
+### 49.1 — Scope: Integrate and Stabilize, Not Add Features
+
+Project Prompt 20 explicitly asked this session to find and fix bugs from INTERACTIONS
+between existing systems, not build new ones. This session read every remaining
+unreviewed file in the codebase — `main.js`'s full dependency graph, `BuildPipeline.js`,
+every pipeline stage (`RailDetectionStage` through `CompletionStage`), every validator
+(`PlayerValidator` through `PermissionValidator`), `ui/BuildMenu.js`, `TunnelDetector.js`/
+`TunnelPlanner.js`/`TunnelConfig.js`, `OreRegistry.js`, `ProgressReporter.js`/
+`MessageService.js`, `PipelineOutcome.js`/`RequestLifecycleState.js`, `Logger.js`,
+`Vector3Utils.js`, and `LocalizationKeys.js` — none of which had been read end to end in
+Project Prompts 18 or 19, since both focused on `terrain/`/`builder/` specifically. This
+is, as far as this project's own history shows, the first session to have read literally
+every script file in the addon in one pass.
+
+### 49.2 — Real Bugs Found and Fixed
+
+Three genuine issues surfaced by this review, all small, all safe, all fixed:
+
+1. **`TunnelPlanner.js`'s `TerrainPositionFact` construction was missing three fields**
+   (`isExistingRail`, `isUnderwater`, `waterInfo`) added to `TerrainScanner._scanPosition()`'s
+   own fact shape across Project Prompts 18-19. `TunnelPlanner` is the ONLY other place in
+   the codebase that constructs a `TerrainPositionFact` — grepped directly to confirm.
+   Harmless in practice (nothing dereferences these fields without checking `isUnderwater`/
+   the classification first, and a missing object property reads identically to an
+   explicit `undefined` in JavaScript — confirmed no crash risk before treating this as
+   cosmetic rather than urgent), but a real shape inconsistency between the codebase's two
+   fact-producers. Fixed by adding all three fields explicitly (`false`/`undefined`,
+   matching `_unsupportedFact()`/`_unreadableFact()`'s own convention), with a new
+   regression assertion in `tests/terrain.test.mjs` confirming a TUNNEL-classified fact now
+   carries `isExistingRail: false`/`isUnderwater: false` rather than `undefined`.
+2. **`RequestLifecycleState.js`'s `COMPLETED` state doc was stale** — it said "not
+   reachable until PlacementStage/CompletionStage are real (Roadmap Phase 7+)," which
+   stopped being true the moment those stages shipped in Project Prompt 10, and had been
+   wrong for ten sessions. Corrected, following the exact precedent
+   `PipelineOutcome.js`'s own `BUILD_ACCEPTED` doc already set for an identical
+   "this comment is now false, fix it rather than leave it" situation (Project Prompt 11).
+3. **`utils/NotImplemented.js` was fully dead code** — confirmed via
+   `grep -rn "notImplemented\b"` across every script file: zero remaining call sites (every
+   Roadmap Phase 2 stub it was written for has been implemented since, one by one, across
+   nine sessions). Deleted rather than left as clutter — the historical CHANGELOG.md/
+   ARCHITECTURE.md mentions describing its Project Prompt 3 introduction are left
+   untouched, per this project's standing "never rewrite past session history" convention;
+   only the now-pointless source file itself is removed.
+
+None of the three affected player-facing behavior — all were caught by static review
+(grep + reading, not a test failure), which is exactly what "review before adding
+features" is supposed to catch that a feature-focused session's own tests wouldn't.
+
+### 49.3 — Architecture Review: Wiring Confirmed Correct, Not Redesigned
+
+Traced the FULL dependency graph in `main.js` and the stage order in `core/pipeline/BuildPipeline.js`
+end to end: `RailDetectionStage` → `BuildRequestCreationStage` → `ValidationStage` →
+`ModeAvailabilityStage` → `TerrainScanningStage` → `InventoryStage` → `FinalSafetyCheckStage`
+→ `PlacementStage` → `CompletionStage` — matching Project Prompt 20's own expected shape
+(`BuildMenu` lives inside `BuildRequestCreationStage`; `TerrainScanner`/`PathValidator`
+inside `TerrainScanningStage`; `InventoryManager` appears twice, once in `InventoryStage`'s
+pre-build check and again inside each execution strategy's per-block Survival deduction,
+which is correct — not duplication, the same "verify immediately before mutating"
+principle applied at two different points in time). No stage bypasses its role: every
+validator only returns `{valid, reason, localizationKey}`; every stage only translates one
+result shape into `PipelineResult`; only `PlacementStage`'s injected strategies ever touch
+a block. Confirmed, not refactored — no module boundary needed moving.
+
+### 49.4 — New Test Coverage: `tests/integration.test.mjs`
+
+The single most valuable addition this session: a new test file that builds the EXACT
+SAME dependency graph `main.js`'s `buildDependencyGraph()` constructs (copied, since that
+function isn't exported and shouldn't be — importing `main.js` itself would subscribe a
+real world event listener as a side effect) and runs the REAL `BuildPipeline` end to end,
+with only `ui/BuildMenu.js` substituted for a scripted stub (the one class calling
+`@minecraft/server-ui`, which still has no mock — see §48.10/tests/README.md). This is
+the first test in the project's history to prove the WIRING itself works, not just each
+piece individually: a complete NORMAL, BRIDGE, and UNDERGROUND build each run from
+`RailDetectionStage` through `CompletionStage` with rails genuinely readable in the mock
+world afterward; four distinct rejection paths (insufficient rails, held item swapped
+mid-menu, an out-of-range bridge height, each verified to stop at the CORRECT stage with
+a message and to build nothing); and two players building simultaneously (Bridge +
+Underground, different dimensions) through the real pipeline, confirmed completely
+isolated.
+
+**A real bug in this new test's own first draft, found and fixed before being trusted:**
+the first version asserted on hardcoded world coordinates assuming the build origin was
+the player's own position. It isn't — `BuildVector`'s documented ORIGIN RULE places it
+exactly one block ahead of the player, along whichever direction
+`DirectionUtils.snapYawToCardinal(player.getRotation().y)` resolves to (SOUTH for the
+mock's default yaw of 0) — so the test was silently checking the wrong block the whole
+time. A second, unrelated round of the same "test itself was wrong, not the code" pattern
+turned up when running the multiplayer scenario: two of its four failures were the test
+under-provisioning mock inventory/terrain (33 support blocks needed, 20 supplied; a
+10-deep Underground ramp with solid ground only down to y=60 when the ramp needed floor
+support down to y=69) rather than a bridge/underground defect — confirmed by tracing the
+real, correct rejection reasons (`INSUFFICIENT_RAILS`, `UNSUPPORTED_FLOOR`) the pipeline
+reported, not a wrong result. All fixed in the test, not the code, since re-tracing
+confirmed the code's own answer was right both times.
+
+### 49.5 — Multiplayer Isolation: Now Verified Through the Real Pipeline
+
+Prior sessions verified per-player isolation at the level of individual classes
+(`CancellationWatcher`, `BuildSession`, `TerrainScanner`). This session's
+`tests/integration.test.mjs` verifies the SAME property one level up: two players'
+`PipelineContext`s, run concurrently through two independently-constructed dependency
+graphs (mirroring two real, simultaneous player interactions, each producing its own
+graph via `main.js`'s module-load-time construction being a single shared instance in
+production — confirmed this doesn't matter, since every mutable per-build object
+(`BuildRequest`, `BuildSession`) is still constructed fresh per pipeline run regardless of
+how many pipelines share the same stage/service instances), never cross-contaminate
+mode, config, or session objects.
+
+### 49.6 — Performance Safeguards: Confirmed Unchanged
+
+`RailBuilder.run()`'s `system.runJob` wrapping (unchanged since Project Prompt 10) is
+still the only placement mechanism — no new synchronous loop was introduced anywhere this
+session. `ProgressReporter`'s throttling (report only every `UPDATE_INTERVAL_BLOCKS`
+blocks, only for builds at least `MIN_LENGTH_FOR_PROGRESS_UPDATES` long) is unchanged and
+was exercised (silently, via the mock's recorded-message arrays) by every full-pipeline
+integration test above.
+
+### 49.7 — UI and Error-Message Review
+
+Reviewed `ui/BuildMenu.js` end to end (previously never fully read in this project's own
+recent sessions): the 3-screen flow (mode → \[bridge material\] → configuration → summary)
+correctly shows rail type, mode, height/depth, material, and length before any
+construction begins, with distinct "Next" (screen 3) vs. "Build"/"Cancel" (screen 4)
+buttons specifically to prevent accidental construction — matches Project Prompt 20's UI
+review checklist item-for-item. Every rejection message (`PATH_REJECTED_*`,
+`INVENTORY_INSUFFICIENT*`, `VALIDATION_*`, `MENU_INVALID_*`) was re-read against
+`en_US.lang` — all plain-language, no technical jargon, no stray unfilled `%1$s`
+placeholders (confirmed via the same LocalizationKeys↔lang cross-check script used in
+Project Prompts 18-19, extended this session to also check for ORPHANED lang entries —
+found none beyond expected comment lines and `pack.name`/`pack.description`, which
+`manifest.json` reads directly rather than through `LocalizationKeys.js`).
+
+### 49.8 — Known Limitations (disclosed, not hidden, carried forward from prior sessions)
+
+- **Neighbor-update side effects on a pre-existing rail remain unconfirmed** (§48.6) —
+  this session's new full-pipeline test still runs against the same mock world as every
+  other test, so it cannot observe real Bedrock block-update propagation any more than
+  Project Prompt 19's tests could.
+- **No `@minecraft/server-ui` mock exists** — `ui/BuildMenu.js` itself is still untested by
+  any automated harness; `tests/integration.test.mjs` substitutes a scripted stub rather
+  than exercising the real form-building code.
+- **Underground's best-effort landing buffer is still not sealed against water** (§47.10),
+  and the lateral water seal is still not a full shell for very wide aquifers (§47.10) —
+  neither touched this session, out of scope per Project Prompt 20's own "do not add major
+  new features" instruction.
+- **No in-game verification for anything in this or any prior session.** Every claim above
+  is a Node-only, mocked-world verification — see §49.9 and the Minecraft PE test checklist
+  delivered alongside this session's `.mcaddon`.
+
+### 49.9 — Validation Performed
+
+- `node --check` across every script file in `BP/scripts/` (73 files, one fewer than
+  before this session — `NotImplemented.js` removed) and every test file — 0 failures.
+- **191 assertions across 4 test files, all passing**: 55 (`water.test.mjs`, unchanged),
+  68 (`terrain.test.mjs`, +2 new regression assertions for the `TunnelPlanner` fix), 39
+  (`execution.test.mjs`, unchanged), and 29 new (`integration.test.mjs`).
+- LocalizationKeys↔`en_US.lang` cross-check: 0 missing, 0 genuinely orphaned keys.
+- The addon's `.mcaddon` was rebuilt and its internal structure verified (manifests parse
+  as valid JSON, both `.mcpack` archives contain a `manifest.json` at their own root, the
+  outer `.mcaddon` contains exactly the two `.mcpack` files) — see the delivered file and
+  this session's final report for the exact version and packaging result.
+- **Not yet confirmed in-game** — nothing in this project has been play-tested by a human
+  across any of its now-20 sessions. This session's own instructions were explicit that
+  claiming otherwise would be dishonest; every "Validation Performed" section in this
+  document, across every prior session, has said the same thing for the same reason.

@@ -32,7 +32,14 @@ export const RequestLifecycleState = Object.freeze({
   READY: "READY",
   /** The player closed the build menu. */
   CANCELLED: "CANCELLED",
-  /** Reserved — not reachable until PlacementStage/CompletionStage are real (Roadmap Phase 7+). */
+  /**
+   * A build fully finished (PlacementStage + CompletionStage both succeeded).
+   * Genuinely reachable since Project Prompt 10 — this comment previously
+   * said "not reachable until Roadmap Phase 7+" and was stale ever since;
+   * corrected during Project Prompt 20's integration review rather than
+   * left to drift further (same class of stale-comment fix PipelineOutcome.js's
+   * BUILD_ACCEPTED doc already received during Project Prompt 11's review).
+   */
   COMPLETED: "COMPLETED",
   /** A validation, inventory, or unexpected error stopped the request. */
   FAILED: "FAILED",

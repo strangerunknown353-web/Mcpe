@@ -88,6 +88,16 @@ export class TunnelPlanner {
         aboveBlockId: undefined,
         isGroundSolid: true,
         isAboveReplaceable: false, // it isn't yet — that's the whole point, TunnelExcavator makes it so before placement
+        // isExistingRail/isUnderwater/waterInfo added Project Prompt 18/19 to
+        // TerrainPositionFact — a tunnel position is never either (a bored
+        // rock tunnel is never a pre-existing rail or a body of water; if it
+        // legitimately were, TunnelDetector's own hazard/liquid check would
+        // have already failed the tunnel before this fact is ever built).
+        // Explicit here rather than left absent, matching
+        // TerrainScanner.js's own `_unsupportedFact()`/`_unreadableFact()` —
+        // this is the only OTHER place in the codebase that constructs a
+        // TerrainPositionFact, and every producer should agree on its shape.
+        isExistingRail: false,
         isLoaded: true,
         isInBounds: true,
         classification: TerrainClassification.TUNNEL,
@@ -95,6 +105,8 @@ export class TunnelPlanner {
         slopeDirection: null,
         unsupportedReason: undefined,
         futureMetadata: { excavationPositions: [railPosition, headroomPosition] },
+        isUnderwater: false,
+        waterInfo: undefined,
       });
     }
 

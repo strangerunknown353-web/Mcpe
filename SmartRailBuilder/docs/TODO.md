@@ -483,6 +483,33 @@ genuine regression evidence, just not a re-run of the original files byte-for-by
       confirm: whether placing a new rail next to a hand-built one ever disturbs the
       hand-built one's own shape via an engine-level neighbor update (§48.6/§48.10).
 
+## Completed — Pre-Prompt-21 Integration Test (Project Prompt 20) ✅
+- [x] **Full integration/stabilization review, no new features** — read every
+      remaining unreviewed script file in the addon (`main.js`, `BuildPipeline.js`,
+      every validator, `ui/BuildMenu.js`, tunnel detection, small utilities). Pipeline
+      wiring confirmed correct end to end, not redesigned. §49.1/§49.3.
+- [x] **Fixed: `TunnelPlanner.js`'s fact shape** was missing 3 fields
+      (`isExistingRail`/`isUnderwater`/`waterInfo`) the OTHER fact-producer already had
+      — harmless in practice, a real inconsistency, fixed with a new regression test.
+      §49.2.
+- [x] **Fixed a stale doc comment** (`RequestLifecycleState.js`'s `COMPLETED`, wrong
+      for ten sessions) and **removed fully dead code** (`utils/NotImplemented.js`,
+      zero remaining call sites). §49.2.
+- [x] **Added `tests/integration.test.mjs`** — builds the real dependency graph and
+      runs the real `BuildPipeline` end to end for all 3 modes, 4 rejection paths, and
+      a 2-player multiplayer scenario. First test in the project to verify the WIRING
+      itself. Two real bugs in the test's own first draft were found and fixed before
+      being trusted. §49.4.
+- [x] **UI and error-message review** — `BuildMenu.js`'s full flow and every rejection
+      message re-checked; 0 missing/orphaned localization keys. §49.7.
+- [x] 191 assertions across 4 test files, all passing. `node --check` clean across
+      every script file (73, one fewer — dead code removed).
+- [x] **New `.mcaddon` packaged, version 0.1.13** — structure verified.
+- [ ] **Awaiting your in-game test pass** — full numbered checklist delivered alongside
+      the `.mcaddon` in this session's final report. Same standing limitation as every
+      prior session: neighbor-update side effects on a pre-existing rail (§48.6) remain
+      genuinely unconfirmable without a live client.
+
 ## ⚠️ Order Note (Pre-Prompt-18 Bug-Fix Pass)
 Uploaded with four specific bug reports and four screenshots, explicitly instructing
 "DO NOT START PROJECT PROMPT 18 YET." Honored — Project Prompt 18 was not started.
@@ -496,16 +523,15 @@ broken, the packaging fix (bugfix session) and the `.mcaddon` import itself rema
 right place to start ruling things out first, since nothing else can be verified until
 that works.
 
-## Up Next — Roadmap Phase 20+ (not started)
-(Per Project Prompt 19's own scope limit: no new building modes, no blueprint/undo, no
-UI redesign, no automatic Normal/Bridge/Underground switching this session. See
-ROADMAP.md's Phase 20+ backlog, still including underground tunnel lighting —
-ARCHITECTURE.md §45.12 — the two water-specific follow-ups noted in ARCHITECTURE.md
-§47.10, and now also a `@minecraft/server-ui` test mock so `ui/BuildMenu.js` can
-finally be covered (§48.10). Project Prompt 20 itself, whenever it arrives, is
-milestone-gated on your test pass of this session, per the project's standing
-workflow — including the one thing this session's tests cannot confirm: neighbor-update
-side effects on a pre-existing rail (§48.6).)
+## Up Next — Roadmap Phase 21+ (not started)
+(Per Project Prompt 20's own scope limit: integration/stabilization only, no new
+features, no blueprint/undo, no UI redesign. See ROADMAP.md's Phase 21+ backlog, still
+including underground tunnel lighting — ARCHITECTURE.md §45.12 — the two water-specific
+follow-ups noted in ARCHITECTURE.md §47.10, and a `@minecraft/server-ui` test mock so
+`ui/BuildMenu.js` can finally be covered (§49.8). Project Prompt 21 itself, whenever it
+arrives, is milestone-gated on your test pass of THIS session, per the project's
+standing workflow — including the one thing no session's tests can confirm without a
+live client: neighbor-update side effects on a pre-existing rail (§48.6/§49.8).)
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.
@@ -513,7 +539,7 @@ The checklist that used to live under this heading now lives under Phase 16, whe
 actual bridge engine has now been built. Heading kept, body intentionally emptied, for
 session-history continuity — not a second, duplicate copy of the same checklist.)
 
-## Backlog (Roadmap Phase 20+, not scheduled yet)
+## Backlog (Roadmap Phase 21+, not scheduled yet)
 - [ ] Curved rail placement (extends `RailPermutationBuilder.js`, per its own design notes)
 - [x] ~~Underwater railways~~ — done, Roadmap Phase 18 (Project Prompt 18). See
       ARCHITECTURE.md §47.
@@ -521,7 +547,7 @@ session-history continuity — not a second, duplicate copy of the same checklis
       just omitted when unsafe — ARCHITECTURE.md §47.10)
 - [ ] A wider (non-lateral-only) waterproof shell for large aquifer pockets, if needed
 - [ ] A `@minecraft/server-ui` test mock so `ui/BuildMenu.js` can be covered by an
-      automated test (ARCHITECTURE.md §48.10)
+      automated test (ARCHITECTURE.md §49.8)
 - [ ] Undo system
 - [ ] Railway blueprint save/load
 - [ ] Railway templates

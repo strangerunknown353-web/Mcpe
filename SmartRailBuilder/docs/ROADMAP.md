@@ -1061,7 +1061,35 @@ REGRESSION (must still work exactly as before):
 - [ ] Two players building simultaneously (including near/through each other) — confirm
       complete isolation and no corruption from either build
 
-## Phase 20+ — Reserved for Future Features (planned only when reached)
+## Phase 20 — Pre-Prompt-21 Integration Test (Project Prompt 20) — COMPLETE (awaiting in-game confirmation)
+
+Status: full integration/stabilization pass, no new features. This session read every
+remaining unreviewed script file in the addon for the first time in the project's
+history — `main.js`'s full dependency graph, the complete `BuildPipeline` stage order,
+every validator, `ui/BuildMenu.js`, the tunnel-detection subsystem, and every small
+utility file — and found three small, safe bugs from cross-session interactions: a
+`TerrainPositionFact` shape inconsistency in `TunnelPlanner.js` (missing 3 fields added
+by Project Prompts 18-19), one stale doc comment, and one fully dead code file. All
+three fixed. The pipeline wiring itself (`RailDetectionStage` through `CompletionStage`)
+was traced end to end and confirmed correct, not redesigned. A new test file,
+`tests/integration.test.mjs`, builds the exact same dependency graph `main.js` does and
+runs the real `BuildPipeline` end to end for all three modes plus four rejection paths
+plus a two-player multiplayer scenario — the first test in this project to verify the
+WIRING itself, not just individual pieces. See ARCHITECTURE.md §49 for the complete
+write-up, including two real bugs this session's own new tests caught in themselves
+(wrong assumed coordinates, under-provisioned mock terrain/inventory) before being
+trusted. **A new, testable `.mcaddon` was packaged and delivered this session** — version
+0.1.13. 191 assertions across 4 test files, all passing; `node --check` clean.
+
+### Phase 20 Manual Testing Checklist
+See this session's final report (delivered alongside the `.mcaddon`) for the complete,
+numbered Minecraft PE testing checklist covering all three modes, all four rail types,
+lengths 1/5/20/64, bridge heights 1/4/8/12/16, underground depths 1/5/10/15/20/21
+(rejection), underwater scenarios, all rail-intersection geometries, Survival/Creative
+resource behavior, cancellation, and multiplayer — organized by this session's own
+Test Scenarios 1-13.
+
+## Phase 21+ — Reserved for Future Features (planned only when reached)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is
 currently dark and will spawn mobs; worth a deliberate decision) · cave-floor filling for
 Underground Mode (BridgeSupportBuilder is the natural reuse) · curved rails · undo
@@ -1074,7 +1102,7 @@ buffer against water too (currently just omitted when unsafe, see ARCHITECTURE.m
 §47.10) · a wider (not just lateral) waterproof shell for large aquifer pockets, if
 in-game testing shows the current thin seal is ever insufficient · a mock for
 `@minecraft/server-ui` so `ui/BuildMenu.js` can finally be covered by an automated test
-(see ARCHITECTURE.md §48.10).
+(see ARCHITECTURE.md §49.8).
 
 Each of these gets the same treatment as Phases 2–15: design discussion first, one
 milestone at a time, your testing before moving on.

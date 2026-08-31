@@ -129,6 +129,15 @@ const UNBREAKABLE = { typeId: "minecraft:bedrock" };
   const result = scanner.scanPath(createBuildVector({ x: 0, y: 64, z: 0 }, "east"), 6, dim);
   assertEqual(result.positions[3].classification, TerrainClassification.TUNNEL, "steep-but-thin hill: bored as a TUNNEL, never a vertical jump");
   assertTrue(result.buildReady, "steep-but-thin hill: still buildReady");
+  // Regression (Project Prompt 20 integration review): TunnelPlanner.js is
+  // the only OTHER place besides TerrainScanner._scanPosition() that
+  // constructs a TerrainPositionFact, and was found to be missing the
+  // isExistingRail/isUnderwater fields added in Project Prompts 18/19 —
+  // harmless in practice (nothing dereferenced them without a null-check),
+  // but an inconsistent shape across the codebase's two fact-producers.
+  // Fixed alongside this test.
+  assertEqual(result.positions[3].isExistingRail, false, "a TUNNEL fact has isExistingRail explicitly false, not undefined");
+  assertEqual(result.positions[3].isUnderwater, false, "a TUNNEL fact has isUnderwater explicitly false, not undefined");
 }
 
 {

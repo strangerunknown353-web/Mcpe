@@ -42,9 +42,10 @@ export const ADDON = Object.freeze({
   // fixed alongside this one). All three numbers — this constant, BP/manifest.json,
   // and RP/manifest.json — should be bumped together going forward. See
   // CHANGELOG.md's Project Prompt 15 entry and TODO.md for the full write-up of
-  // this finding. Bumped to 0.1.12 this session (Project Prompt 19 — Smart
-  // Terrain Adaptation & Rail Connectivity); all three numbers confirmed in sync.
-  VERSION: "0.1.12",
+  // this finding. Bumped to 0.1.13 this session (Project Prompt 20 — Full
+  // Integration, Stability & Real-World Test Build); all three numbers
+  // confirmed in sync.
+  VERSION: "0.1.13",
 });
 
 /**

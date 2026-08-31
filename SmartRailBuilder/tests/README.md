@@ -1,11 +1,12 @@
 # Smart Rail Builder — Test Harness
 
 Added Project Prompt 18 (planning-side coverage), substantially extended
-Project Prompt 19 (execution-side coverage). No mocked test harness was
-present in the uploaded project archive for any prior session (see
-`docs/ARCHITECTURE.md`'s §33.2/§34.5 — this gap was flagged repeatedly, never
-fixed) — this directory is what actually closes it, committed to the
-repository rather than left in a session-local temp directory.
+Project Prompt 19 (execution-side coverage), and Project Prompt 20 (full
+end-to-end pipeline coverage). No mocked test harness was present in the
+uploaded project archive for any prior session (see `docs/ARCHITECTURE.md`'s
+§33.2/§34.5 — this gap was flagged repeatedly, never fixed) — this directory
+is what actually closes it, committed to the repository rather than left in
+a session-local temp directory.
 
 ## Running
 
@@ -13,6 +14,7 @@ repository rather than left in a session-local temp directory.
 node tests/water.test.mjs
 node tests/terrain.test.mjs
 node tests/execution.test.mjs
+node tests/integration.test.mjs
 ```
 
 No dependencies, no build step — plain Node (22+), ESM (`.mjs`).
@@ -100,21 +102,50 @@ unlocked by the new mocks above:
   untouched; two simultaneous `scanPath()` calls for two different
   players/build vectors never cross-contaminate.
 
+`integration.test.mjs` (Project Prompt 20) — the full-pipeline counterpart:
+builds the exact same dependency graph `main.js`'s `buildDependencyGraph()`
+constructs (every real stage, every real validator, the real
+`BuildPipeline`), with only `ui/BuildMenu.js` replaced by a scripted stub
+(the one class that calls `@minecraft/server-ui`, which has no mock — see
+below). Confirms the WIRING itself, not just each piece in isolation:
+- A complete NORMAL, BRIDGE, and UNDERGROUND build each run from
+  `RailDetectionStage` through `CompletionStage`, with rails actually
+  readable in the mock world afterward and the correct Survival inventory
+  deduction.
+- Four distinct rejection paths (insufficient rails, held item swapped mid-menu,
+  an out-of-range bridge height, and — implicitly, via every SUCCESS case
+  above — that `FinalSafetyCheckStage` doesn't re-reject a still-valid plan)
+  each stop at the CORRECT stage with a `localizationKey`, and confirm
+  nothing is built when a build is rejected (Section 10 resource safety).
+- Two players building simultaneously (Bridge + Underground, different
+  dimensions) through the real pipeline stay completely isolated —
+  independent configuration, independent `BuildSession`s, independent
+  inventories.
+
+A real bug in the test's OWN first draft was found and fixed by this
+process, worth naming since it's exactly the kind of thing a full pipeline
+run catches that piecemeal tests can't: the first version asserted on block
+coordinates assuming the build origin was the player's own position — it
+isn't (`BuildVector`'s ORIGIN RULE places it one block ahead, along whichever
+direction `player.getRotation().y` resolves to), so with the mock's default
+yaw the assertions were silently checking the wrong coordinates. Fixed by
+pinning an explicit yaw and computing the real expected origin from
+`DirectionUtils`' own documented bands, rather than adjusting the assertion
+to match whatever the code happened to do.
+
 ## What's NOT covered (known gaps, not solved this session)
 
 - `ui/BuildMenu.js` and anything using `@minecraft/server-ui`
   (`ActionFormData`/`ModalFormData`/`MessageFormData`) — no mock exists for
-  that package yet. Form-building/UI flow is untested by this harness.
-- `main.js`'s dependency-injection wiring itself (which concrete classes get
-  constructed and passed to which constructor) is not exercised end-to-end —
-  each test constructs the classes it needs directly.
+  that package yet. Form-building/UI flow is untested by this harness;
+  `integration.test.mjs` substitutes a scripted stub for `BuildMenu` instead.
 - Real Bedrock semantics this mock doesn't attempt to replicate: actual tick
   pacing (`system.runJob` here drains a generator to completion
   synchronously, not spread across ticks), real block update/neighbor-sensing
   behavior, real `LocationInUnloadedChunkError`/`LocationOutOfWorldBoundariesError`
   timing nuances.
 
-**In-game verification has not been performed for anything in this or the
+**In-game verification has not been performed for anything in this or any
 prior session** — this harness (like every one before it, per
 `docs/ARCHITECTURE.md`'s own running theme) approximates the real API
 surface; it does not replace an actual play-test.
