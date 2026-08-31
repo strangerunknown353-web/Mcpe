@@ -117,9 +117,16 @@ unlocked by the new mocks above:
   quantity), Creative bypass, and that a deeper/bigger terrain gap produces a
   strictly larger planning-time material requirement.
 - Multiplayer isolation: `CancellationWatcher` cancels only the player whose
-  `playerLeave` fired, leaving a second player's session completely
-  untouched; two simultaneous `scanPath()` calls for two different
-  players/build vectors never cross-contaminate.
+  event fired, leaving a second player's session completely untouched — for
+  all 4 cancellation events, not just `playerLeave` (Project Prompt 27 closed
+  a real coverage gap here: `playerDimensionChange`, `entityDie`/player death,
+  and `playerGameModeChange` were implemented and subscribed since Project
+  Prompt 10 but had never been individually exercised by a test before this
+  session). Also: a dedicated orphaned-lock regression confirming an already-
+  unregistered session is never retroactively cancelled by a late-arriving
+  event, and that a fresh session for a reused player id starts clean. Two
+  simultaneous `scanPath()` calls for two different players/build vectors
+  never cross-contaminate.
 
 `integration.test.mjs` (Project Prompt 20) — the full-pipeline counterpart:
 builds the exact same dependency graph `main.js`'s `buildDependencyGraph()`

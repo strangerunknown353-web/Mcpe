@@ -1,5 +1,66 @@
 # Changelog — Smart Rail Builder (formerly Ryzen Rail Builder — renamed Project Prompt 10)
 
+## [1.0.0] — FINAL RELEASE — 2026-08-31
+
+The complete, released feature set. Per-session detail for every item below is in the dated
+entries further down this file; this section is the consolidated release summary.
+
+### Railway building
+- **Normal Mode** — straight railway following the terrain, in the direction the player faces.
+  Handles flat ground, ±1-block rises and drops with correctly-shaped sloped rails, and bores a
+  tunnel through rises too tall to climb. 1–64 blocks per build.
+- **Bridge Mode** — gradual ascent to a chosen height (1–16), a level crest across the gap, and
+  a gradual descent back to terrain. Lightweight piered structure (supports every 4 blocks)
+  rather than a solid filled mass; player-chosen bridge material; material requirement
+  calculated automatically; crosses water.
+- **Underground Mode** — descending ramp to a chosen depth (1–20) then a level run, with a
+  player-height corridor, clean entrance and exit, a landing pocket at the terminus, waterproof
+  sealing where the corridor cuts through water, and ore-aware excavation that refuses to
+  silently destroy valuable ores.
+- **All four vanilla rail types** — Rail, Powered Rail, Detector Rail, Activator Rail — in all
+  four cardinal directions.
+- **Underwater railways** and water-safe construction across all three modes.
+
+### Safety
+- Full-route validation before any block is placed; a failed validation modifies **zero** blocks.
+- Lava detection and rejection before excavation.
+- Existing rails of all four types are never overwritten — the build is planned around them.
+- Player structures (chests, containers, doors, beds, signs, furnaces, and similar) are
+  protected; an unsafe route is rejected rather than forced through.
+- Unbreakable blocks, unloaded chunks and out-of-bounds positions all rejected safely.
+- Terrain and inventory are re-verified immediately before construction, and again before every
+  single block placement, because a multi-tick build can outlive its own plan.
+
+### Resources
+- Survival: exact rail and bridge-material counts, deducted one item at a time and only after
+  the corresponding block is confirmed placed. No deduction on a rejected or cancelled build.
+- Creative: quantity checks bypassed entirely; the held rail type still determines what is built.
+- Interruption keeps what was already built and charges nothing beyond it — no rollback, no
+  refund, by design.
+
+### Multiplayer
+- Fully independent per-player UI, configuration, build plan, material, progress and job.
+- Overlapping build areas are rejected with a clear message rather than merged or corrupted.
+- Player leave, death, dimension change and game-mode change each cancel only that player's build.
+
+### Interface
+- Four-screen build flow (mode → material for Bridge → configuration → summary) with an explicit
+  Build/Cancel confirmation; invalid values rejected by both the UI and the backend.
+- Throttled action-bar progress and clear plain-English error messages for every failure path.
+
+### Performance
+- Construction runs through `system.runJob`, spread across ticks; no long synchronous loops.
+- Early-exit inventory checks, single-pass terrain scanning, and no duplicate re-scans.
+
+### Presentation
+- Official name **Smart Rail Builder**, pack icon for both packs, wordmark logo, branded menu
+  titles and completion messages.
+
+### Honest status at release
+No version of this add-on, including 1.0.0, has ever been run in a real Minecraft client.
+Verification is a 432-assertion Node.js suite against a mocked API, static analysis, and package
+validation. See `README.md`'s Known Limitations and ARCHITECTURE.md §59.7–§59.8.
+
 ## [Unreleased]
 
 ### Phase 1 — Foundation, Architecture & Planning — 2026-07-18
@@ -1369,3 +1430,185 @@ consecutive session on a base that has still never been confirmed in-game — se
 - **Not yet confirmed in-game** — this session's own instructions were explicit that
   claiming otherwise without an actual Minecraft launch would be dishonest; none of
   this project's 26 sessions has been play-tested by a human.
+
+### Project Prompt 27 — Final Engineering, Bug Fixing, Compatibility & Stability Pass — 2026-08-31
+
+- **Fixed: `PlacementStage.js` sent the "construction started" chat message before checking
+  the multiplayer conflict claim, not after.** A player whose build lost a conflicting claim
+  (`RAIL_CONFLICT`) still received "Building N rails going..." immediately followed by the
+  rejection message, even though no construction had started. Fixed by moving the
+  `ActiveBuildRegistry.claim()` check to the very first statement in `execute()`, before any
+  player-facing message — zero effect on the claim's already race-free, synchronous-before-
+  the-one-`await` design. ARCHITECTURE.md §56.2.
+- **Fixed: `ModeConfigValidator.js`'s docstring claimed underground depth's valid range was
+  1-64.** The actual, always-correctly-enforced bound (read dynamically from
+  `config/BuildModes.js`) is 1-20 — a stale comment mismatch, not a functional bug (runtime
+  enforcement was always correct). ARCHITECTURE.md §56.2.
+- **Re-investigated the previously-reported rail-crossing bug from scratch**, per Project
+  Prompt 27's explicit "do not simply suppress the symptom" instruction — confirmed the
+  existing `RAIL_ITEM_ID_SET` "never touch what's already there" fix (bugfix pass before
+  Project Prompt 18, re-confirmed Project Prompt 19) is still correctly applied across all 3
+  execution strategies and all 4 rail types, with its one disclosed neighbor-update-tick
+  limitation still open and unconfirmable without a live client. ARCHITECTURE.md §56.3.
+- **Found and closed a real test-coverage gap: 3 of `CancellationWatcher.js`'s 4
+  cancellation events had never been tested.** `playerDimensionChange`, `entityDie` (player
+  death), and `playerGameModeChange` have been correctly implemented and subscribed since
+  Project Prompt 10, but only `playerLeave` had a dedicated test. `tests/execution.test.mjs`
+  now covers all 4, each with multiplayer isolation re-confirmed, plus a new orphaned-lock
+  regression test. All new assertions passed against the unmodified production code — a
+  coverage gap, not a functional bug, mirroring Project Prompt 26's direction-coverage
+  finding. ARCHITECTURE.md §56.4.
+- **Confirmed sound, no changes needed:** API compatibility (every `@minecraft/server`/
+  `@minecraft/server-ui` call site re-checked against the targeted stable API), both
+  manifests (UUIDs, versions, dependencies, engine version), rail detection, direction math,
+  Normal/Bridge/Underground boundary values, bridge design, underwater/lava safety,
+  existing-structure protection, resource transaction safety, async revalidation,
+  cancellation, multiplayer isolation, performance, and memory/state cleanup. Cross-registry
+  contradiction check (new this session): `UnbreakableBlockRegistry`/`ReplaceableBlockRegistry`/
+  `HazardRegistry` checked pairwise for overlapping entries — none found. ARCHITECTURE.md
+  §56.5-§56.8.
+- **Honestly disclosed audit-coverage gap:** two of three planned independent parallel review
+  passes were interrupted by a platform rate limit before completing; the files they were
+  assigned were instead covered only indirectly this session (via the classes they call into
+  and the passing test suite), not individually re-read start-to-end. Flagged as Prompt 28's
+  recommended first checklist item rather than silently presented as fully reviewed.
+  ARCHITECTURE.md §56.7.
+- **Files modified:** `BP/scripts/core/pipeline/stages/PlacementStage.js`,
+  `BP/scripts/core/validation/ModeConfigValidator.js`, `tests/buildPlanSafety.test.mjs`,
+  `tests/execution.test.mjs`, `BP/scripts/config/Constants.js` + both manifests (version
+  0.1.19 → 0.1.20).
+- **Packaged a new, testable `.mcaddon`** — version 0.1.20, structure verified (manifests
+  valid, all 4 version fields agree, both `.mcpack` archives correctly rooted, `.mcaddon`
+  contains exactly the 2 expected `.mcpack` files).
+- **Validation:** 432 assertions across 9 test files (420 unchanged/prior + 11 new
+  cancellation-event assertions + 1 new message-ordering regression assertion), all passing.
+  `node --check` clean across all 79 script files. Full detail in ARCHITECTURE.md §56.10.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of
+  this project's 27 sessions has been play-tested by a human.
+
+### Project Prompt 28 — Release Candidate — 2026-08-31
+
+- **Closed the one honestly-disclosed audit-coverage gap from Project Prompt 27.** Every file
+  a rate-limit-interrupted parallel review pass had left un-individually-read was read in full
+  this session: `inventory/ResourceValidator.js`, `core/BuildRequest.js`, `BuildVector.js`,
+  `pipeline/stages/RailDetectionStage.js`/`BuildRequestCreationStage.js`/`InventoryStage.js`/
+  `FinalSafetyCheckStage.js`/`BuildPlanStage.js`/`CompletionStage.js`, and all 6 `pipeline/*.js`
+  support files. **Zero new defects found.** `PipelineOutcome.js`'s `classifyOutcome()`
+  independently confirmed Project Prompt 27's `PlacementStage` fix is correctly wired end to
+  end. ARCHITECTURE.md §57.2.
+- **Cross-checked the implementation against ARCHITECTURE.md/ROADMAP.md/CHANGELOG.md/TODO.md
+  for discrepancies — none found.** Version numbers, the `ModeConfigValidator` bound, the
+  rail-crossing policy, `CancellationWatcher`'s event list, and `BUILD_MODE_REGISTRY`'s bounds
+  all agree between documentation and implementation. ARCHITECTURE.md §57.3.
+- **Confirmed the full Core Feature Freeze list (Project Prompt 28 §3)** — every required rail
+  type, direction, mode, and general capability is implemented and regression-tested. A
+  re-confirmation, not new work; no feature was added this session. ARCHITECTURE.md §57.4.
+- **Versioned as Release Candidate 1.** The three numeric version fields continue the
+  project's unbroken sequential convention to 0.1.21; the "-rc1" label lives in
+  `ADDON.VERSION`'s free-form string and the `.mcaddon` filename, since manifest version
+  arrays cannot carry a suffix. Explicitly not the final release — Project Prompt 30 owns
+  that. ARCHITECTURE.md §57.5.
+- **Files modified:** `BP/scripts/config/Constants.js` + both manifests (version
+  0.1.20 → 0.1.21, `ADDON.VERSION` also gains the "-rc1" label).
+- **Packaged the Release Candidate `.mcaddon`** — `SmartRailBuilder-v0.1.21-rc1.mcaddon`,
+  structure verified (manifests valid, all 4 version fields agree at 0.1.21, both `.mcpack`
+  archives correctly rooted, `.mcaddon` contains exactly the 2 expected `.mcpack` files).
+- **Validation:** 432 assertions across 9 test files, all passing — unchanged from Project
+  Prompt 27 (no production logic was modified this session beyond the version bump).
+  `node --check` clean across all 79 script files. Full detail in ARCHITECTURE.md §57.6.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of
+  this project's 28 sessions has been play-tested by a human. Per Project Prompt 28's own
+  rule, Project Prompt 29 (branding) will not begin until your gameplay testing of this
+  Release Candidate is satisfactory.
+
+### Project Prompt 29 — Official Branding, Logo & Visual Identity — 2026-08-31
+
+- **Name check, not a change.** Project Prompt 29's own text named "Ryzen Rail Builder" as
+  official — directly contradicting Project Prompt 10's deliberate rename to "Smart Rail
+  Builder," in place for 19 sessions and matching the repository, folder, and every delivered
+  `.mcaddon`. Raised with you directly before any work began; **you confirmed "Smart Rail
+  Builder" stays official.** No rename occurred. ARCHITECTURE.md §58.2.
+- **Added the project's first pack icon and logo.** `BP/pack_icon.png`/`RP/pack_icon.png`
+  (256×256, procedurally generated — a diagonal rail-track-and-sleepers motif with a small
+  amber gear badge, no third-party material) — there was no pack icon at all before this
+  session, so Bedrock would have shown its generic default in the pack list. Also added a
+  documentation-only wordmark lockup (`docs/assets/logo.png`, `logo-mark.png`).
+  ARCHITECTURE.md §58.3.
+- **Branded 2 of 4 build-menu screen titles** (mode-select and summary — the flow's first and
+  last screens) to name the addon, matching the pattern the configuration screen's title
+  already used since Project Prompt 15. The other 2 screens were deliberately left alone to
+  avoid repeating the name on every screen. ARCHITECTURE.md §58.4.
+- **Added a short, muted branded tag to the 3 build-completion messages** (Normal/Bridge/
+  Underground), per Project Prompt 29's own example format and its explicit "do not prefix
+  every message" instruction — no other message touched. ARCHITECTURE.md §58.5.
+- **Zero gameplay logic changed.** Every change this session is a `.lang` text value, a new
+  binary image asset, or the version constant — confirmed via `node --check` (0 failures
+  across 79 files) and the full 432-assertion suite (unchanged, all passing). No test
+  asserts literal English UI text, so none needed updating. ARCHITECTURE.md §58.9.
+- **Files added:** `BP/pack_icon.png`, `RP/pack_icon.png`, `assets/branding/pack_icon.png`,
+  `docs/assets/logo.png`, `docs/assets/logo-mark.png`.
+- **Files modified:** `RP/texts/en_US.lang` (2 title values + 3 completion-message values),
+  `BP/scripts/config/Constants.js` + both manifests (version 0.1.21 → 0.1.22, `ADDON.VERSION`
+  label "-rc1" → "-rc2").
+- **Packaged the branded `.mcaddon`** — `SmartRailBuilder-v0.1.22-rc2.mcaddon`, structure
+  verified (manifests valid, all 4 version fields agree at 0.1.22, both `.mcpack` archives
+  correctly rooted and now each containing their own `pack_icon.png`, `.mcaddon` contains
+  exactly the 2 expected `.mcpack` files).
+- **Validation:** 432 assertions across 9 test files, all passing — unchanged from Project
+  Prompt 28. `node --check` clean across all 79 script files. Full detail in ARCHITECTURE.md
+  §58.9.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of this
+  project's 29 sessions has been play-tested by a human. Whether the pack icon actually
+  renders correctly and whether the lengthened titles display acceptably on a small screen
+  are both flagged for your testing, not claimed as confirmed. Project Prompt 30 (final
+  release) has NOT been started.
+
+### Project Prompt 30 — FINAL RELEASE v1.0.0 — 2026-08-31
+
+- **No functional code changed this session.** Per Project Prompt 30's own "only make changes
+  that are necessary or clearly beneficial" and "do not introduce risky rewrites" instructions,
+  the only edits are the version fields, a new `README.md`, and documentation. All 79 script
+  files behave identically to the Project Prompt 29 build.
+- **Ran the §28 final quality gate as an executable script, not from memory** — 37 checks
+  against the live source tree, **37 passed, 0 failed**: all 4 rail types registered; all 4
+  directions resolving to distinct unit step vectors with correct opposites; all 3 modes present
+  and `implemented: true`; every enforced limit (bridge height 1–16, underground depth 1–20,
+  length 1–64, tunnel clearances 2/3, pier spacing 4); all branding assets and strings;
+  localization parity (84 keys, 0 missing, 0 orphaned); and rail-intersection protection
+  independently confirmed in all three execution strategies plus `TerrainScanner`.
+  ARCHITECTURE.md §59.2.
+- **Final version 1.0.0.** All five version fields (`ADDON.VERSION`, BP header, BP script
+  module, BP's dependency-on-RP entry, RP header + resources module) set to `1.0.0`/`[1, 0, 0]`
+  and verified programmatically to agree. No `-rc`/`-beta`/`-test`/`-dev` suffix remains. The 4
+  entity UUIDs are unchanged — changing one at release would orphan existing installations.
+  ARCHITECTURE.md §59.3.
+- **Created `README.md`** — the project never had one. Covers what the add-on does, the three
+  modes and their real ranges, all four rail types, the bridge (16) and depth (20) limits,
+  step-by-step usage, Survival/Creative/multiplayer behavior, and a complete Known Limitations
+  section led by the disclosure that the add-on has never been run in a real client.
+  ARCHITECTURE.md §59.5.
+- **Consolidated release changelog** added at the top of this file (the `[1.0.0]` section),
+  summarising the complete shipped feature set per Project Prompt 30 §19.
+- **Naming settled without re-asking**: Project Prompt 30's text is internally inconsistent
+  (title/§29/§30/closing line say "Smart Rail Builder"; §2 says "Ryzen Rail Builder"). The user
+  answered this directly in Project Prompt 29 — Smart Rail Builder — and the dominant signal
+  here agrees. ARCHITECTURE.md §59.4.
+- **Files added:** `README.md`.
+- **Files modified:** `BP/scripts/config/Constants.js`, both manifests (0.1.22 → 1.0.0), and all
+  four docs.
+- **Packaged the final `.mcaddon`** — `SmartRailBuilder-v1.0.0.mcaddon`, structurally verified:
+  both `.mcpack` archives readable, manifests valid with all version fields at `[1, 0, 0]`, 4
+  distinct UUIDs, script entry point present, all 79 scripts present, both `pack_icon.png` assets
+  present and identical, localization present, zip integrity clean, and **zero development
+  artifacts** (`node_modules/`, `tests/`, `docs/`, `assets/` are all outside the two packaged
+  directories — confirmed by inspecting the archive listing).
+- **Validation:** 432 assertions across 9 test files, all passing — unchanged. `node --check`
+  clean across all 79 script files. ARCHITECTURE.md §59.7.
+- **Still not confirmed in-game.** No session in this project's 30-session history has ever run
+  the add-on in a real Minecraft client, and 1.0.0 ships with that stated plainly in its README
+  rather than hidden. The release is accompanied by a 20-part Minecraft PE test plan and a
+  structured bug-report format. Per Project Prompt 30 §29, no Phase 31 exists and none will be
+  invented; future work is user-requested only.

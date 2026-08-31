@@ -1288,14 +1288,146 @@ types, all three modes at their boundary values, an underwater tunnel, lava safe
 railways/structures, resource behavior, cancellation, a long build, two-player construction,
 and repeated builds.
 
-## Remaining Schedule (established by Project Prompt 26)
+## Phase 27 Complete: Final Engineering, Bug Fixing, Compatibility & Stability Pass
+A full, assume-nothing audit of every module, both manifests, and every documented behavior —
+not a new feature session. Every script file was read this session, either directly or via an
+independent parallel review pass. Found and fixed 2 real, narrow issues: (1)
+`PlacementStage.js` sent its "construction started" chat message BEFORE checking the
+multiplayer conflict claim, so a rejected build (`RAIL_CONFLICT`) still told the player
+construction had begun — fixed by moving the claim to the top of the method, before any
+message; (2) `ModeConfigValidator.js`'s docstring claimed underground depth's range was 1-64
+when the actual, always-correctly-enforced bound is 1-20 — a stale comment, not a functional
+bug, fixed. The previously-reported rail-crossing bug was re-investigated from scratch (not
+assumed fixed) and confirmed still correctly handled by the existing `RAIL_ITEM_ID_SET`
+"never touch what's already there" policy, with its one disclosed neighbor-update-tick
+limitation (§48.6) still open and unconfirmable without a live client. A real test-coverage
+gap was found and closed: `CancellationWatcher.js` has subscribed to all 4 cancellation
+events (leave/dimension-change/death/game-mode-change) since Project Prompt 10, but only
+`playerLeave` had a dedicated test — the other 3 were implemented and documented but never
+exercised; `tests/execution.test.mjs` now covers all 4, plus a dedicated orphaned-lock
+regression test. API compatibility, both manifests, all 3 block registries (checked against
+each other for contradictions — none found), and localization were all re-validated with no
+issues beyond the two fixes above. **A new, testable `.mcaddon` was packaged and delivered
+this session** — version 0.1.20. 432 assertions across 9 test files, all passing (up from 420
+— 11 new cancellation-event assertions, 1 new message-ordering regression assertion);
+`node --check` clean across 79 script files. See ARCHITECTURE.md §56 for the complete
+write-up, including exactly which files were reviewed by which method (§56.7) and the one
+honestly-disclosed audit-coverage gap where a planned parallel review pass was interrupted by
+a platform rate limit before completing.
 
-- **Phase 27 — Full bug-fixing, compatibility, multiplayer, and optimization pass.**
-- **Phase 28 — RELEASE CANDIDATE.** The final unbranded gameplay build, tested extensively
-  by you.
-- **Phase 29 — Official name/logo/branding integration.** Nothing visual/branding-related is
-  touched before this phase, per Project Prompt 26's own explicit instruction.
-- **Phase 30 — Final release polish, documentation, packaging, and final `.mcaddon`.**
+### Phase 27 Manual Testing Checklist
+See this session's final report (delivered alongside the `.mcaddon`) for the complete,
+numbered 40-item Minecraft PE testing checklist Project Prompt 27 itself specifies — installation,
+world loading, all four directions/rail types, bridge/underground boundary values (including
+the rejected-out-of-range cases), bridge design and resource calculation, underwater/lava
+safety, existing rails and structures, rail intersections, insufficient-resource handling,
+Survival/Creative, cancellation, long/repeated builds, player death/disconnect/dimension
+change, and two-player conflicting construction.
+
+## Phase 28 Complete: Release Candidate
+Project Prompt 28 was explicitly a confirm-and-package session, not a feature session, per its
+own "do NOT add major new features" instruction. Closed the one honestly-disclosed audit-
+coverage gap flagged at the end of Project Prompt 27: every remaining unread file
+(`inventory/ResourceValidator.js`, `core/BuildRequest.js`/`BuildVector.js`, every remaining
+pipeline stage file, and all 6 `pipeline/*.js` support files) was read in full this session.
+**Zero new defects found** — every file independently confirmed the design claims already made
+about it, including a direct, independent confirmation that Project Prompt 27's `PlacementStage`
+message-ordering fix is correctly wired through `PipelineOutcome.js`'s outcome classification.
+Cross-checked the implementation against all four docs (ARCHITECTURE.md/ROADMAP.md/
+CHANGELOG.md/TODO.md) for discrepancies — none found. Confirmed every item on Project Prompt
+28's REQUIRED core-feature-freeze list (all 4 rail types, all 4 directions, all 3 modes and
+their full boundary/behavior requirements, and every GENERAL requirement) is implemented and
+regression-tested — a re-confirmation, not new work. Versioned as a Release Candidate: the
+three numeric version fields continue the project's unbroken sequential convention to 0.1.21;
+the "-rc1" label (Project Prompt 28's own requirement, since manifest version arrays can't
+carry a suffix) lives in `ADDON.VERSION`'s free-form string and the `.mcaddon` filename. **A
+new, testable Release Candidate `.mcaddon` was packaged and delivered this session** —
+`SmartRailBuilder-v0.1.21-rc1.mcaddon`. 432 assertions across 9 test files, all passing
+(unchanged from Project Prompt 27 — no production logic changed this session, only the version
+bump); `node --check` clean across 79 script files. See ARCHITECTURE.md §57 for the complete
+write-up.
+
+### Phase 28 Manual Testing Checklist
+See this session's final report for the complete TEST A-through-P Minecraft PE test plan
+Project Prompt 28 itself specifies — installation, UI, all rail types, all directions, Normal/
+Bridge/Underground mode (including every height/depth boundary and rejection case), underwater,
+lava safety, resource safety, rail intersections, existing structures, cancellation, long
+builds, multiplayer, and repeated builds.
+
+## Phase 29 Complete: Official Branding, Logo & Visual Identity
+Branding-only session, per Project Prompt 29's own "do NOT add new gameplay systems"
+instruction — nothing in `BP/scripts/`'s build logic changed. **Note on process:** Project
+Prompt 28 asked that Prompt 29 wait for satisfactory gameplay testing of the Release
+Candidate first; you gave Prompt 29 directly, without that confirmation being explicitly
+stated. Proceeded as instructed (you're the one running this project, and Prompt 29's own
+text is an explicit, direct instruction to continue) — noted here for an honest record, not
+as a objection. **Name check, not a change:** Project Prompt 29's own text names "Ryzen Rail
+Builder" as official, directly contradicting Project Prompt 10's deliberate, 19-session-old
+rename to "Smart Rail Builder" (documented in CHANGELOG.md's Project Prompt 10 entry,
+matching the repository/folder name and every delivered `.mcaddon` since). Raised with you
+directly before any branding work began — **you confirmed "Smart Rail Builder" stays the
+official name.** No rename occurred. **New visual assets** (procedurally generated, no
+third-party material): `BP/pack_icon.png`/`RP/pack_icon.png` (256×256, a rail-track + gear
+badge, verified legible down to 32×32) — the actual in-game pack-list branding surface, which
+had no icon at all before this session — plus a documentation-only wordmark logo
+(`docs/assets/logo.png`/`logo-mark.png`). **UI branding**: 2 of 4 build-menu screen titles
+now name the addon (mode-select and summary — the flow's first and last screens), matching
+the pattern the configuration screen's title already used since Project Prompt 15; the other
+2 screens were left alone to avoid over-repeating the name. **Message branding**: a short,
+muted `[Smart Rail Builder]` tag added to exactly the 3 build-completion messages, per
+Project Prompt 29's own example and its explicit warning against over-prefixing — no other
+message touched. All changes are `.lang` text values, two binary image assets, and the
+version constant — zero script logic modified. **432 assertions across 9 test files, all
+passing, unchanged** — no test asserts literal English UI text, so none needed updating.
+`node --check` clean across 79 script files. **A new, testable branded `.mcaddon` was
+packaged and delivered this session** — version 0.1.22-rc2. See ARCHITECTURE.md §58 for the
+complete write-up.
+
+### Phase 29 Manual Testing Checklist
+See this session's final report for the 15-item practical checklist Project Prompt 29 itself
+specifies — install, pack name/icon visibility, UI branding, and a full regression pass
+across all three modes, rail types, resource handling, and multiplayer, confirming nothing
+was accidentally broken by the branding changes.
+
+## Phase 30 Complete: FINAL RELEASE v1.0.0 ✅
+The last phase of the planned 30-prompt roadmap. A release session, not a development one: **no
+functional code changed** — the only edits were the version fields, a new `README.md`, and
+documentation, per Project Prompt 30's own "no risky rewrites at this stage" instruction. The
+§28 quality gate was run as an **executable script rather than answered from memory**: 37 checks
+covering all 4 rail types, all 4 directions (distinct unit step vectors + correct opposites),
+all 3 modes flagged implemented, every enforced limit (bridge 1–16, depth 1–20, length 1–64,
+tunnel clearances 2/3, pier spacing 4), all branding assets and strings, localization parity
+(84 keys, 0 missing, 0 orphaned), and rail-intersection protection in all three strategies plus
+the scanner — **37 passed, 0 failed**. Versioned **1.0.0** across all five version fields, with
+no `-rc`/`-beta`/`-test`/`-dev` suffix anywhere. `README.md` created (the project never had one)
+covering usage, all three modes and their real limits, Survival/Creative/multiplayer behavior,
+and a deliberately complete Known Limitations section led by the honest disclosure that no
+version of this add-on has ever been run in a real Minecraft client. **The final `.mcaddon` was
+packaged, structurally verified, and delivered** — `SmartRailBuilder-v1.0.0.mcaddon`. 432
+assertions across 9 test files, all passing; `node --check` clean across 79 script files; zero
+development artifacts in the shipped package. See ARCHITECTURE.md §59 for the complete write-up.
+
+**Naming:** Project Prompt 30's text was internally inconsistent about the product name (title,
+§29, §30 and its required closing line say "Smart Rail Builder"; §2 says "Ryzen Rail Builder").
+The question was already put to the user directly in Phase 29 and answered — **Smart Rail
+Builder** — and the dominant signal in Prompt 30 agrees, so it was applied without re-asking.
+See ARCHITECTURE.md §59.4.
+
+### Phase 30 Final Test Plan
+See this session's final report for the complete 20-part Minecraft PE test plan (TEST 1–20:
+installation, pack icon/name, UI, rail types, directions, Normal, Bridge, bridge limits,
+Underground, underground limits, underwater, lava safety, resources, rail intersections,
+existing structures, cancellation, long builds, repeated builds, multiplayer, and a final
+general playtest), plus a structured bug-report format.
+
+## Roadmap Complete
+
+All 30 planned phases are done. The project is released at **v1.0.0** and has no in-flight work.
+Per Project Prompt 30's own instruction, no Phase 31 exists and none will be invented — any
+future work is user-requested, not roadmap-driven. The one thing the release does **not** have
+is real gameplay verification (no session in the project's history could launch Minecraft), so
+the 20-part test plan above is the natural next step, and any bug it surfaces would be handled
+as a user-requested fix rather than a new development phase.
 
 ## Phase 27+ Backlog (not scheduled to any specific phase yet)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is

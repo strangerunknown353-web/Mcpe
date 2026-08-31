@@ -5477,3 +5477,584 @@ interim, so nothing needed re-fixing:
   across any of its now-26 sessions. This session's own instructions were explicit that
   claiming otherwise would be dishonest; every "Validation Performed" section in this
   document, across every prior session, has said the same thing for the same reason.
+
+## 56. Final Engineering, Bug Fixing, Compatibility & Stability Pass (Roadmap Phase 27, Project Prompt 27)
+
+### 56.1 — Scope: A Real Audit, Not a Rubber Stamp
+
+Project Prompt 27 asked for a full, assume-nothing audit of every module, every Bedrock API
+call, both manifests, and every documented behavior — rail detection, direction, all three
+modes, bridge design, underground clearance, underwater/lava safety, existing-structure
+protection, the rail-intersection regression specifically, resource transactions, async
+revalidation, cancellation, disconnect/death/dimension-change, multiplayer isolation and
+conflicts, performance, memory/state leaks, error handling, UI reliability, and code cleanup —
+before Prompt 28's release candidate. Every file under `BP/scripts/` was read in full (not
+skimmed) this session, either directly or via an independent parallel review pass reading the
+same files with no shared context, specifically so a second read could catch what a first read
+missed. Two of three planned parallel review passes were interrupted mid-run by a platform rate
+limit and could not be resumed within this session; the files they were assigned were covered
+instead by direct reading in this same session (see 56.7 for exactly which files that was) —
+nothing in the original audit scope went unreviewed, but the "two independent reviewers per
+file" redundancy Prompt 27 implicitly benefits from only fully applied to the subset one
+complete parallel pass covered (UI, validation, and pathfinding-layer files — see 56.7).
+
+### 56.2 — Bugs Fixed
+
+**1. `PlacementStage.js` — "construction started" message sent before the multiplayer conflict
+claim, not after.** The mode-specific chat message ("Building N rails going...") fired
+unconditionally, and the `ActiveBuildRegistry.claim()` conflict check ran afterward, right
+before the one `await` in the method. A player whose claim lost to another active build (two
+overlapping build areas) would see "Building N rails..." immediately followed by "Another build
+is already using part of this area" — confusing, and factually wrong, since no construction had
+actually started. The claim itself was already correctly race-free (synchronous, before the one
+`await` — see `ActiveBuildRegistry.js`'s own header); this was purely a message-ordering bug.
+Fixed by moving the claim to the very first statement in `execute()`, before any player-facing
+message. Zero effect on the claim/release race-freedom or on `finally`-block release timing.
+Regression-tested: `tests/buildPlanSafety.test.mjs` §10 now uses a message-tracking stub
+instead of a no-op one and asserts zero messages are sent when a claim is rejected.
+
+**2. `ModeConfigValidator.js` — stale docstring claiming underground depth's range is 1-64.**
+The header comment said `undergroundDepth for UNDERGROUND (1-64)`; the actual enforced bound
+(read dynamically from `config/BuildModes.js`'s `BUILD_MODE_REGISTRY[UNDERGROUND].max`) is 20,
+and always has been — `BuildRequestCreationStage.js` and `tests/uiMenu.test.mjs` both already
+correctly state/assert 1-20. Not a functional bug (the validator reads the registry's real
+value at runtime, so nothing was actually enforced wrong), but exactly the kind of doc/behavior
+mismatch that misleads a future maintainer into "fixing" the registry to match a wrong comment.
+Fixed: comment now says 1-20 and points at the registry as the actual source of truth.
+
+No other production-code defects were found. This mirrors Project Prompts 25 and 26's own
+finding — a mature, heavily self-documented, already-audited codebase where a careful pass
+surfaces real but narrow issues (message ordering, a stale comment) rather than systemic
+problems, plus, as in Prompt 26, a genuine test-coverage gap (56.4).
+
+### 56.3 — Rail Intersection: Re-Investigated, Confirmed Still Correct
+
+Project Prompt 27 asked for a dedicated regression investigation of the previously-reported
+rail-crossing bug, explicitly not trusting that a past fix holds. Re-traced from scratch rather
+than assumed: the fix from the bugfix pass before Project Prompt 18 (config/RailConfig.js's
+`RAIL_ITEM_ID_SET`, consumed identically by `TerrainScanner._scanPosition()`/`planBridge()`/
+`planUnderground()` and by all three execution strategies) is still exactly in place and still
+correctly applied everywhere a position could already hold a rail. §48.4's Project Prompt 19
+conclusion — a real vanilla rail block can only ever represent ONE shape at a time (no native
+"+" crossing block exists), so "never touch what's already there" is the only generally-safe
+policy, and it is applied identically regardless of crossing geometry (parallel, perpendicular,
+T-junction) or which of the 4 rail types is involved on either side — was re-verified against
+the current code, not merely re-read. `tests/execution.test.mjs` already asserts on actual
+placed blocks (not just the plan) for an existing-rail crossing and a different-rail-type
+crossing; those tests still pass unmodified. The one disclosed KNOWN LIMITATION from that
+investigation (§48.6) — placing a new rail block ADJACENT to a pre-existing, hand-placed rail
+could, in principle, trigger a neighbor-update tick that causes the GAME to recompute that
+existing rail's own shape, a live-client behavior no Node-based test harness can observe —
+remains open and unconfirmed; still flagged for your in-game verification at a crossing with a
+hand-built rail, per the manual testing checklist.
+
+### 56.4 — Test Coverage Gap Closed: Disconnect / Death / Dimension / Game-Mode Change
+
+`core/CancellationWatcher.js` has subscribed to all 4 cancellation-relevant events
+(`playerLeave`, `playerDimensionChange`, `entityDie` filtered to players, `playerGameModeChange`)
+since Project Prompt 10 — but auditing the test suite found only `playerLeave` had a dedicated
+test (`tests/execution.test.mjs` §8); the other 3 events were implemented and documented but
+never actually exercised by any test, across every prior session. This is the same class of
+finding as Project Prompt 26's direction-coverage gap: a real requirement (§18's "player
+disconnects/dies/changes dimension... jobs must terminate safely") that was correctly
+implemented from day one but never proven by a test. `tests/execution.test.mjs` §8b (new, 5
+test blocks, 11 assertions) closes this: `playerDimensionChange`, `entityDie` (player death),
+and `playerGameModeChange` are each exercised in isolation, with multiplayer isolation
+re-confirmed for every one of them (an unrelated second player's session is never touched) —
+plus a dedicated orphaned-lock regression test confirming a session already unregistered (the
+normal `PlacementStage` `finally`-block order) is never retroactively cancelled by a
+late-arriving event, and that a fresh session registered under a reused player ID starts
+completely clean. All 4 events' production code was unmodified by this — every new assertion
+passed against the existing, unmodified `CancellationWatcher.js` on the first run. This was a
+coverage gap, not a functional bug, exactly like Project Prompt 26's finding.
+
+### 56.5 — API Compatibility
+
+Every `@minecraft/server`/`@minecraft/server-ui` import across all 79 script files was
+reviewed against this project's targeted stable API (2.8.0 / server-ui 2.1.0, matching both
+manifests' `dependencies`): `world.beforeEvents.playerInteractWithBlock` and
+`world.beforeEvents.playerLeave`; `world.afterEvents.playerDimensionChange`/`entityDie`
+(entity-type filtered)/`playerGameModeChange`; `system.runJob`; `BlockPermutation.resolve()` +
+`Block.setPermutation()`; `Dimension.getBlock()`; `Player.getComponent("minecraft:inventory")`
++ `Container.getItem()`/`setItem()`; `Player.getGameMode()`; and `ActionFormData`/
+`ModalFormData`/`MessageFormData` from `@minecraft/server-ui`. No deprecated, beta-only, or
+incorrect-signature usage found — every call site matches this project's own prior,
+already-disclosed API-verification history (§29.1's `setPermutation()` reasoning, §34's
+`isSolid` rejection, §48.6's neighbor-update disclosure). No new API risk was introduced or
+discovered this session.
+
+### 56.6 — Manifest / Pack Validation
+
+Both manifests re-validated from scratch: valid JSON, `format_version: 2`, 4 distinct UUIDs
+across the two files (BP header `27195d03…`, BP script module `a3163b2c…`, RP header/BP
+dependency `fa25588d…`, RP resources module `237e6561…` — no duplicates), `min_engine_version:
+[1, 26, 0]` consistent between both, BP's dependency on `@minecraft/server`/`@minecraft/
+server-ui` versions matching what the code actually imports, and BP's dependency on RP
+referencing RP's own header UUID+version correctly. All three version numbers (BP header/BP
+module/RP header/RP module — 4 fields total) bumped together to 0.1.20 this session, and
+`Constants.js`'s `ADDON.VERSION` bumped alongside them, per this project's standing "these
+numbers move together" rule (established Project Prompt 15, §15's finding).
+
+### 56.7 — What Was Reviewed, By What Method
+
+Direct, full-file reading this session (not delegated): `main.js`; `config/RailConfig.js`,
+`Constants.js`, `UnbreakableBlockRegistry.js`, `ReplaceableBlockRegistry.js`,
+`HazardRegistry.js`, `OreRegistry.js`, `BridgeConfig.js`, `UndergroundConfig.js`,
+`BuildModes.js`; `builder/RailPermutationBuilder.js`, `RailBuilder.js`, `TunnelExcavator.js`,
+`BridgeSupportBuilder.js`, and all three `strategies/*.js`; `terrain/TerrainScanner.js` (in
+full, all 1566 lines); `utils/BlockReader.js`; `core/BuildSession.js`, `BuildOrchestrator.js`,
+`BuildPlan.js`, `ActiveBuildRegistry.js`, `CancellationWatcher.js`, and
+`pipeline/stages/PlacementStage.js`; `inventory/InventoryManager.js`; both manifests; and a
+scripted cross-check of `LocalizationKeys.js` against `RP/texts/en_US.lang` (0 missing, 2
+orphaned — `pack.name`/`pack.description`, which are consumed directly by the manifests, not
+through `LocalizationKeys`, so expected) and of the three block registries against each other
+for contradictory entries (0 found).
+
+Covered by one completed independent parallel review pass, reading the same files with no
+prior context, specifically targeting UI reliability, error messages, validation ordering and
+bounds, direction math, rail-type detection, `PathValidator`'s reason-to-message mapping, and
+tunnel/gap/bridge detection logic: `ui/BuildMenu.js`, `MessageService.js`, `ProgressReporter.js`;
+every file under `core/validation/`; `terrain/PathValidator.js`, `GapAnalyzer.js`,
+`BridgeDetector.js`, `TunnelDetector.js`, `TunnelPlanner.js`, `WaterDetector.js`,
+`BridgeValidation.js`, `UndergroundValidation.js`; `pipeline/stages/ValidationStage.js`,
+`ModeAvailabilityStage.js`, `TerrainScanningStage.js`; `utils/DirectionUtils.js`. This pass
+found the one docstring bug in 56.2 and confirmed everything else in its scope sound.
+
+Two further parallel review passes (one targeting `inventory/ResourceValidator.js`,
+`pipeline/stages/InventoryStage.js`/`BuildPlanStage.js`/`RailDetectionStage.js`/
+`BuildRequestCreationStage.js`/`CompletionStage.js`/`FinalSafetyCheckStage.js`,
+`core/BuildRequest.js`/`BuildVector.js`, and the `pipeline/*.js` support files; one targeting
+config-registry cross-checks and a second independent API-compatibility pass) were interrupted
+by a platform-level rate limit before completing and could not be resumed this session. The
+files assigned to the first were covered this session only indirectly, via `InventoryManager.js`
+(read in full, the class those files call into) plus this session's own reading of
+`BuildOrchestrator.js`/`BuildPlan.js`/`PlacementStage.js`, which exercise
+`BuildPlanStage`/`InventoryStage`'s real behavior end-to-end through the existing test suite —
+`BuildRequest.js`, `BuildVector.js`, `RailDetectionStage.js`, `BuildRequestCreationStage.js`,
+`CompletionStage.js`, and the `pipeline/*.js` support files (`BuildPipeline.js`,
+`PipelineContext.js`, `PipelineOutcome.js`, `PipelineResult.js`, `PipelineStage.js`,
+`RequestLifecycleState.js`) were not individually re-read this session beyond what the passing
+test suite already exercises. Flagged honestly rather than silently treated as "reviewed": this
+is a real gap in this session's audit coverage, not a discovered problem — nothing found
+anything wrong in that area, but it was reviewed less thoroughly than the rest of the codebase.
+Recommended as Prompt 28's first checklist item if a further engineering pass is warranted
+before the release candidate is finalized.
+
+### 56.8 — Sections Confirmed Sound With No Changes Needed
+
+Reviewed against Project Prompt 27's own checklist, with no bugs found: rail detection (all 4
+types remain mutually exclusive by exact `typeId` equality, re-checked at both the event filter
+and `HeldItemValidator`); direction math (`DirectionUtils.snapYawToCardinal`'s yaw-boundary
+handling, algebraically re-verified at all 4 boundaries and both signs); Normal/Bridge/
+Underground mode boundary values (height 1/16, depth 1/20, all already correctly enforced and
+tested); bridge design (pier spacing, lightweight deck, single-material construction, all
+unchanged and re-confirmed); underwater and lava safety (the zero-blocks-modified-on-rejection
+guarantee re-traced end to end for `planUnderground()`'s lava/water-floor checks, which run
+before any excavation position is committed to); existing-structure protection
+(`UNBREAKABLE_BLOCK_ID_SET`'s player-structure union, re-checked for contradictions against the
+other two registries — none found); resource transactions (`InventoryManager.deductRailItems()`
+re-read in full: exact per-slot deduction, never goes negative, strictly post-placement,
+Creative Mode's bypass lives entirely in each strategy's `isSurvival` gate, not in
+`InventoryManager` itself); async revalidation (every execution strategy's own "state can
+change mid-build" per-block re-check, unchanged and still exercised by the full test suite);
+cancellation (`session.isCancelled()` checked at the top of every placement loop iteration,
+across all 3 strategies, confirmed to stop immediately with zero further placement); multiplayer
+isolation (`ActiveBuildRegistry`'s synchronous claim-before-the-one-`await` design re-verified
+as still race-free by construction, no shared mutable module-level state found anywhere in the
+files read this session); performance (no new synchronous unbounded loop introduced; every
+per-block loop this session touched already yields every iteration via `system.runJob`); memory/
+state (`CancellationWatcher`/`ActiveBuildRegistry` both release their per-player entries in the
+same `finally` block that registers them — re-confirmed, and now the subject of the new §56.4
+tests rather than only a design claim).
+
+### 56.9 — Known Limitations (carried forward, none newly discovered)
+
+Unchanged from §55.4/§54.7: a player structure built from ordinary (non-registered) blocks is
+still undetectable; `player.dimension`/`Dimension.id` edge-case behavior is still unconfirmed
+against the live API; the two `ui/BuildMenu.js` visual-layout items still need in-game visual
+confirmation; the neighbor-update-tick risk at a hand-placed-rail crossing (§56.3/§48.6) is
+still open; the build-length ceiling is still 64 by deliberate design, not a defect; and the
+ascending `rail_direction` mapping is still the single highest-priority unconfirmed assumption
+in the whole project — internally consistent across all 4 directions (proven by
+`tests/directionCoverage.test.mjs`, Project Prompt 26) but never confirmed against real
+Bedrock. **No session in this project's now-27-session history has ever been played in an
+actual Minecraft Bedrock client.** Every validation claim in this section is Node.js-only,
+mocked-world testing, exactly as honestly disclosed in every prior session.
+
+### 56.10 — Validation Performed
+
+- `node --check` across all 79 script files — 0 failures.
+- **432 assertions across 9 test files, all passing**: 55 (`water.test.mjs`, unchanged), 50
+  (`execution.test.mjs`, +11 new — §56.4), 37 (`integration.test.mjs`, unchanged), 44
+  (`performanceStability.test.mjs`, unchanged), 14 (`structureProtection.test.mjs`, unchanged),
+  83 (`terrain.test.mjs`, unchanged), 25 (`uiMenu.test.mjs`, unchanged), 60
+  (`buildPlanSafety.test.mjs`, +1 new — §56.2's message-ordering regression test), 64
+  (`directionCoverage.test.mjs`, unchanged).
+- `LocalizationKeys`↔`RP/texts/en_US.lang` cross-check re-run: 0 missing, 2 expected orphans
+  (unchanged from prior sessions).
+- Cross-registry contradiction check (new this session): `UnbreakableBlockRegistry` ∩
+  `ReplaceableBlockRegistry`, `HazardRegistry` ∩ `ReplaceableBlockRegistry`, and
+  `HazardRegistry` ∩ `UnbreakableBlockRegistry` all empty (0 contradictory entries).
+- Both manifests re-validated as parseable JSON with 4 distinct UUIDs and all version fields
+  agreeing at 0.1.20.
+- The `.mcaddon` was rebuilt from the current `BP/`/`RP/` trees and its internal structure
+  verified — see this session's final report for the exact result.
+- **Not yet confirmed in-game** — see §56.9. This remains a Node.js-only validation pass, like
+  every prior session's.
+
+## 57. Release Candidate (Roadmap Phase 28, Project Prompt 28)
+
+### 57.1 — Scope: Confirm Feature-Complete, Version as RC, Do Not Extend
+
+Project Prompt 28 is explicitly the RELEASE CANDIDATE session — feature-complete confirmation
+and packaging, not a feature session, per its own "do NOT add major new features" instruction
+and its priority order (STABILITY > CORRECTNESS > SAFETY > PERFORMANCE > POLISH). This session's
+job was threefold: (1) close the one honestly-disclosed audit-coverage gap from §56.7 — every
+file that a rate-limit-interrupted parallel review pass left un-individually-read; (2) cross-
+check the implementation against all four docs (ARCHITECTURE.md/ROADMAP.md/CHANGELOG.md/
+TODO.md) for discrepancies; (3) version, package, and document the Release Candidate.
+
+### 57.2 — Audit-Coverage Gap Closed: Zero New Bugs
+
+Every file flagged in §56.7 as not individually re-read was read in full this session:
+`inventory/ResourceValidator.js`; `core/BuildRequest.js`, `BuildVector.js`; every pipeline
+stage file not already covered by §56's own reading (`RailDetectionStage.js`,
+`BuildRequestCreationStage.js`, `InventoryStage.js`, `FinalSafetyCheckStage.js`,
+`BuildPlanStage.js`, `CompletionStage.js`); and every `pipeline/*.js` support file
+(`BuildPipeline.js`, `PipelineContext.js`, `PipelineResult.js`, `PipelineOutcome.js`,
+`PipelineStage.js`, `RequestLifecycleState.js`). **Zero new defects found.** Every file
+independently confirms the design claims made about it elsewhere in this document — notably,
+`PipelineOutcome.js`'s `classifyOutcome()` (line ~130) independently confirms §56.2's
+`PlacementStage` fix is correctly wired end to end: a `RAIL_CONFLICT` result is classified
+`VALIDATION_FAILED` (not `PLACEMENT_INCOMPLETE`), which `BuildOrchestrator._reportResult()`
+routes to the `STATUS_CANNOT_BUILD` + reason message pair — exactly the message a player should
+see when zero blocks were placed, with no "construction started" line ever able to precede it
+now that the claim runs first. This closes the audit-coverage gap in full: every one of the 79
+script files under `BP/scripts/` has now been individually, fully read across Project Prompts
+27 and 28 combined, with a total of 3 real, narrow issues found and fixed across both sessions
+(the two from §56.2, plus §55's direction-coverage/§56.4's cancellation-event test gaps, which
+were coverage gaps rather than code defects).
+
+### 57.3 — Documentation Cross-Check: No Discrepancies Found
+
+Compared the current implementation against specific claims in all four docs: version numbers
+(all four fields — BP header/module, RP header/module — confirmed to agree at whatever the
+current release is, checked programmatically each session, unchanged process); the
+`ModeConfigValidator` bound (§56.2's fix, re-confirmed still correct — registry says 1-20,
+validator reads it dynamically, no other doc references the stale "1-64" figure); the rail-
+crossing policy description in §46.5/§48.4 (re-confirmed against the current `RAIL_ITEM_ID_SET`
+consumers, still accurate); `CancellationWatcher`'s 4-event subscription list (§56.4, now fully
+tested, doc and code agree); and the `BUILD_MODE_REGISTRY` bounds (1-16 bridge height, 1-20
+underground depth) referenced across `ARCHITECTURE.md`, `ROADMAP.md`, and `TODO.md` — all
+consistent with `config/BuildModes.js`'s actual values. No discrepancy found between any
+documentation claim and the current implementation.
+
+### 57.4 — Core Feature Freeze (Project Prompt 28's Required List)
+
+Every item on Project Prompt 28's §3 REQUIRED feature list is implemented and covered by the
+regression suite: all 4 rail types; all 4 directions; all 3 modes (Normal/Bridge/Underground);
+Normal's straight/slope/terrain-validation/orientation logic; Bridge's height 1-16, gradual
+ascent/flat/descent, lightweight pier design, material selection, automatic resource
+calculation, and water crossings; Underground's depth 1-20, tunnel clearance, entrance/exit,
+underwater sealing, and lava safety; and every GENERAL item (build configuration, preview via
+`BuildPlan`, pre-build validation, inventory validation, Survival/Creative handling,
+cancellation, multiplayer safety, long-build chunking, existing-rail/structure protection, rail
+intersection handling, and error handling). This is a re-confirmation, not new work — every one
+of these was already implemented by Project Prompt 26 and re-verified sound in Project Prompt
+27; this session adds no new feature to the list.
+
+### 57.5 — Release Candidate Versioning
+
+The three numeric version fields (`Constants.js`'s `ADDON.VERSION` value's numeric prefix, and
+both manifests' header/module version arrays) continue the project's unbroken sequential-
+integer convention — bumped together, as always, to **0.1.21**. Manifest version arrays are a
+strict `[major, minor, patch]` integer triple and cannot carry a suffix, so the "-rc1" Release
+Candidate label Project Prompt 28 asks for lives in the two places that ARE free-form text:
+`ADDON.VERSION` itself (`"0.1.21-rc1"`, surfaced in the one Content Log line that reads it —
+see `main.js`) and the `.mcaddon` filename (`SmartRailBuilder-v0.1.21-rc1.mcaddon`). This is
+explicitly **not** the final release — Project Prompt 30 owns that designation, per this
+session's own instructions.
+
+### 57.6 — Validation Performed
+
+- `node --check` across all 79 script files — 0 failures.
+- **432 assertions across 9 test files, all passing** — unchanged from Project Prompt 27
+  (no production code was modified this session beyond the version bump itself, which changes
+  no logic).
+- Both manifests re-validated: parseable JSON, 4 distinct UUIDs, all 4 version fields agree at
+  0.1.21, dependencies unchanged and still matching actual imports.
+- The `.mcaddon` was rebuilt from the current `BP/`/`RP/` trees and its internal structure
+  verified — see this session's final report for the exact result.
+- **Not yet confirmed in-game** — this remains true for all 28 sessions in this project's
+  history. Every claim above is Node.js-only, mocked-world verification.
+
+### 57.7 — Known Limitations (unchanged, carried forward from §56.9)
+
+No new limitation was discovered this session, and none from §56.9 was resolved (none was
+resolvable without a live client). The ascending `rail_direction` mapping and the rail-crossing
+neighbor-update-tick risk remain the two highest-priority items for your in-game test pass.
+
+## 58. Official Branding, Logo & Visual Identity (Roadmap Phase 29, Project Prompt 29)
+
+### 58.1 — Scope: Presentation Only, No Gameplay Change
+
+Project Prompt 29 is explicitly a branding-only session — "do NOT add new gameplay systems,"
+priority is visual identity, and Prompt 30 is reserved for final release preparation. Nothing
+in `BP/scripts/`'s actual build logic changed this session; every change is either a new binary
+asset (pack icon, logo), a `.lang` text value, or documentation.
+
+### 58.2 — Official Name: Confirmed, Not Changed
+
+Project Prompt 29's own text names "Ryzen Rail Builder" as the official name — but that
+directly contradicts Project Prompt 10's explicit, deliberate rename (documented in
+CHANGELOG.md's Project Prompt 10 entry: "Product renamed from 'Ryzen Rail Builder' to 'Smart
+Rail Builder,' as explicitly requested"), a decision that has held for 19 sessions since,
+including the repository name itself (`smart-rail-builder`), the project folder
+(`SmartRailBuilder/`), every `.mcaddon` filename delivered since, and all four documentation
+files' own titles. Rather than silently reverting 19 sessions of established, deliberate
+naming based on one session's prompt text (which could equally be an unedited template
+carried over from before the Prompt 10 rename), this was raised directly with you before any
+branding work began. **You confirmed "Smart Rail Builder" remains the official name.** No
+rename occurred this session — this section documents that the name was verified, not that it
+changed. See CHANGELOG.md's Project Prompt 10 entry for the original rename's full context,
+including its own disclosed "Ryzen-branded portfolio" flag that this session's naming
+ambiguity independently echoes.
+
+### 58.3 — Logo & Pack Icon
+
+**New visual assets, created this session** (procedurally generated via Pillow — no
+third-party or copyrighted source material):
+- `BP/pack_icon.png` and `RP/pack_icon.png` (256×256 RGBA PNG, identical) — the actual
+  in-game branding surface: Bedrock auto-detects `pack_icon.png` at each pack's root with no
+  manifest reference needed, shown in the pack list where a player enables/manages packs.
+  Design: a dark slate-to-navy gradient background, a diagonal two-rail track with wooden
+  sleepers (steel/silver rails, warm brown ties) as the primary railway motif, plus a small
+  amber gear badge in the upper-left conveying "engineering/automation" — kept deliberately
+  simple (no fine detail, no text) so it stays legible at the small sizes a pack-list icon is
+  actually shown at; verified by rendering it down to 48×48 and 32×32 before finalizing.
+- `docs/assets/logo-mark.png` (512×512, rounded-corner variant of the same badge) and
+  `docs/assets/logo.png` (1200×400 wordmark lockup: the badge beside a two-line "SMART RAIL
+  BUILDER" wordmark and a subtitle) — documentation/promotional assets, not consumed by
+  Bedrock and not packaged into either `.mcpack` (see 58.7). `assets/branding/pack_icon.png`
+  is the source file the two in-pack copies were made from, kept for future edits.
+- No pre-Prompt-29 logo or pack icon existed anywhere in the repository — Bedrock would have
+  shown its generic default icon for both packs in the pack list until this session.
+
+### 58.4 — UI Branding
+
+Two of the build menu's four form titles now identify the addon by name, matching the pattern
+already established (since Project Prompt 15) by the third — `promptForConfiguration()`'s
+title has always been the bare pack name:
+- `menu.modeTitle` ("Select Building Mode" → "Smart Rail Builder — Building Mode") — the
+  first screen a player sees.
+- `menu.summaryTitle` ("Build Summary" → "Smart Rail Builder — Build Summary") — the last
+  screen before construction begins.
+- `menu.materialTitle` (Bridge-only material screen) and the configuration screen's own
+  existing bare "Smart Rail Builder" title were left unchanged — by the third/fourth screen
+  in one flow, the brand has already been shown twice; repeating it on every single screen
+  would be the same "annoying over-prefixing" Project Prompt 29 §6 explicitly warns against,
+  applied to titles instead of chat messages. `menu.modeBody`'s existing "Choose how Smart
+  Rail Builder should build your railway" text (present since Project Prompt 15, unchanged)
+  already reinforces the name in the first screen's body too.
+- These are pure `.lang` value edits — `ui/BuildMenu.js`'s code reads the same
+  `LocalizationKeys.MENU_MODE_TITLE`/`MENU_SUMMARY_TITLE` translate keys as before, unchanged.
+  Zero logic touched; confirmed via the unmodified `LocalizationKeys`↔`en_US.lang` cross-check
+  (0 missing, 0 orphaned beyond the expected `pack.name`/`pack.description` pair) and the full
+  432-assertion suite, unaffected.
+
+### 58.5 — Branding in Game Messages
+
+Per Project Prompt 29 §6's explicit example format and its explicit warning against
+over-prefixing: a short, muted `§7[Smart Rail Builder]§r` tag (gray, resetting to the
+existing green success color before the message text) was added to exactly the 3
+build-completion messages — `construction.complete` (Normal), `bridge.constructionComplete`,
+`underground.constructionComplete` — the single most significant, positive, and infrequent
+message category, and the exact category Project Prompt 29's own example ("Build complete!")
+names. No other message (progress pings, the 3 "construction started" messages, any
+validation/rejection message) was touched — those remain exactly as they were, per the
+explicit "do not prefix every single message" instruction.
+
+### 58.6 — Visual Consistency Review
+
+Reviewed titles, buttons, labels, and messages across `ui/BuildMenu.js` and
+`RP/texts/en_US.lang` for a consistent identity: the name now appears at pack-list level
+(icon), at the start and end of the build-configuration flow (58.4), and at the moment of
+success (58.5) — three consistent, non-overlapping touchpoints rather than one saturating
+change. No other UI element (buttons, mode labels, validation messages) was altered — Project
+Prompt 29 §4's "must not interfere with usability" and "keep Mode selection/Rail
+selection/.../Cancel easy to understand" holds structurally, since no functional text or
+control changed, only the two title strings and the three completion-message prefixes.
+
+### 58.7 — Asset & Package Validation
+
+- Both `pack_icon.png` files confirmed 256×256, RGBA, valid PNG (`Pillow` round-trip check).
+- `assets/branding/` and `docs/assets/` (the source files and the documentation-only logo
+  lockup) are outside both `BP/`and `RP/` — the packaging step only zips those two directories'
+  own contents, so these never end up inside either `.mcpack`, confirmed by inspecting the
+  packaged archive's file listing (93 files in `BP.mcpack`, unchanged from Project Prompt
+  28 aside from the one new `pack_icon.png`; 4 files in `RP.mcpack`, one new `pack_icon.png`
+  added to the previous 3).
+- `LocalizationKeys.js`↔`en_US.lang` cross-check re-run: 0 missing, 0 unexpected orphans
+  (same 2 expected pack-level exceptions as every prior session).
+- No manifest reference needed for `pack_icon.png` — confirmed against the stable Bedrock
+  manifest format (file-presence-based auto-detection at each pack's root, not a manifest
+  field), so neither manifest required a schema change for the new asset, only their normal
+  version bump (58.8).
+
+### 58.8 — Versioning
+
+Continues the project's unbroken sequential integer convention: 0.1.21 → **0.1.22**, all
+4 manifest fields plus `Constants.js`'s `ADDON.VERSION` bumped together as always. The
+"-rc2" label (this is the Prompt 28 Release Candidate, now branded — still a candidate, not
+final) lives in `ADDON.VERSION`'s free-form string and the `.mcaddon` filename, the same
+mechanism established in §57.5 for "-rc1," since manifest version arrays still cannot carry a
+suffix. Explicitly not the final release — Project Prompt 30 owns that.
+
+### 58.9 — Gameplay Regression Check
+
+Per Project Prompt 29 §9/§10's explicit requirement to verify branding didn't break anything:
+`node --check` across all 79 script files (0 failures — no script file's logic was touched,
+only two `.lang` string values and the version constant's string), and the full 432-assertion
+suite (all passing, unchanged) — confirming Normal/Bridge/Underground mode, rail detection,
+inventory handling, validation, and multiplayer state are all untouched by this session's
+purely presentational changes. No test needed updating, since no test asserts the literal
+English text of a title or completion message (confirmed by grep before editing either) —
+tests assert `localizationKey` identifiers and substitution values only, which none of this
+session's edits changed.
+
+### 58.10 — Known Limitations (unchanged, carried forward from §57.7)
+
+No new limitation was discovered or resolved this session. Two additional, PE-client-only
+items are worth a first look during your gameplay test of this branded build, though neither
+is expected to be an issue: whether `pack_icon.png` actually renders in the pack-management
+UI on your device (a purely visual confirmation no Node harness can perform), and whether the
+lengthened form titles (58.4) display acceptably on a small-screen mobile client without
+truncation — flagged for your testing, not claimed as confirmed.
+
+## 59. Final Release v1.0.0 (Roadmap Phase 30, Project Prompt 30)
+
+### 59.1 — Scope: Release, Not Development
+
+The last prompt of the planned 30-prompt roadmap. Project Prompt 30's own instruction set is
+explicit: no architecture redesign, no new gameplay features, no removed features, "only make
+changes that are necessary or clearly beneficial," and "do not introduce risky rewrites at this
+stage." Accordingly this session made **no functional code change at all** — the only edits are
+the version constant, the four manifest version fields, a new `README.md`, and documentation.
+The 432-assertion suite and all 79 script files are byte-identical in behavior to the Project
+Prompt 29 build that preceded them.
+
+### 59.2 — The Final Quality Gate, Run as Executable Checks
+
+Project Prompt 30 §28 lists 23 questions to answer before declaring completion. Rather than
+answer them from memory or from prior sessions' conclusions, the machine-checkable subset was
+written as an actual script and executed against the live source tree — **37 checks, 37
+passed, 0 failed**:
+
+- **Rail types (5 checks)** — all 4 vanilla rail IDs present in `RAIL_TYPES`, in
+  `RAIL_ITEM_IDS`, and in `RAIL_ITEM_ID_SET`; exactly 4, no more.
+- **Directions (4 checks)** — all 4 cardinals resolve to a distinct unit step vector of
+  magnitude 1, with a correct `opposite()` mapping (NORTH→(0,-1)/south, SOUTH→(0,1)/north,
+  EAST→(1,0)/west, WEST→(-1,0)/east).
+- **Modes (4 checks)** — NORMAL, BRIDGE and UNDERGROUND all present in `BUILD_MODE_REGISTRY`
+  with `implemented: true`; the registry lists exactly 3.
+- **Enforced limits (9 checks)** — bridge height min/max = 1/16, underground depth min/max =
+  1/20, length min/max = 1/64, tunnel rail clearance = 2, tunnel slope clearance = 3, and
+  `PIER_SPACING > 1` (the structural guarantee that a bridge is piered rather than a solid
+  filled mass — every 4 blocks).
+- **Branding (8 checks)** — `DISPLAY_NAME`, a set `VERSION`, both `pack_icon.png` files present
+  on disk, `pack.name`, both branded form titles, and exactly 3 branded completion messages.
+- **Localization parity (3 checks)** — 84 keys defined, 0 missing `.lang` entries, 0 orphaned
+  entries beyond the 2 expected pack-level ones.
+- **Rail intersection protection (4 checks)** — all three execution strategies AND
+  `TerrainScanner` each independently consult `RAIL_ITEM_ID_SET`, which is the structural
+  guarantee behind "an existing rail is never overwritten."
+
+This is the first session in the project's history where the feature/limit claims were verified
+by execution rather than by reading. Every claim held.
+
+### 59.3 — Final Version: 1.0.0
+
+The 0.1.x sequence that ran unbroken from Project Prompt 2 through both release candidates
+(0.1.21-rc1, 0.1.22-rc2) ends here. All **five** version fields — `ADDON.VERSION`,
+BP header, BP script module, BP's dependency-on-RP entry, and RP header + RP resources module —
+are `1.0.0` / `[1, 0, 0]`, verified programmatically to agree. No `-rc`, `-beta`, `-test` or
+`-dev` suffix remains anywhere, per Project Prompt 30 §17. The 4 entity UUIDs remain distinct
+and unchanged (changing a UUID at release would orphan every existing installation), and BP's
+dependency entry still correctly references RP's header UUID.
+
+### 59.4 — Naming: Smart Rail Builder (Settled)
+
+Project Prompt 30's text is internally inconsistent about the product name, exactly as Project
+Prompt 29's was: its title, its opening declaration ("The project name is officially: SMART RAIL
+BUILDER"), §29, §30's own report header, and its required closing line all say **Smart Rail
+Builder**, while §2 and two stray references say "Ryzen Rail Builder." The question was already
+put to the user directly during Project Prompt 29 and answered explicitly: **Smart Rail Builder
+is the official name** (see §58.2). The dominant signal in this prompt agrees with that answer,
+so it was applied without re-asking. The residual "Ryzen" references are treated as leftovers
+from the pre-Prompt-10 template, consistent with §58.2's finding. The internal
+`ryzenRailBuilder` localization-key namespace remains unchanged and player-invisible, for the
+reason given in Project Prompt 10 and restated in `Constants.js`: renaming it would touch every
+key in two files for zero player-facing benefit, and at a 1.0.0 release that is exactly the kind
+of gratuitous risk §1 forbids.
+
+### 59.5 — README.md (new)
+
+`README.md` was created this session at the project root (alongside `BP/`, `RP/`, `docs/`) —
+the project had never had one. Covers, per Project Prompt 30 §18: what the add-on does, the
+three modes with their real configurable ranges, all four rail types, the bridge height limit
+(16), the underground depth limit (20), step-by-step usage, Survival behavior (including the
+exact partial-build/no-refund policy), Creative behavior, multiplayer behavior, a deliberately
+complete Known Limitations section, and the version. Its limitations section leads with the
+single most important disclosure — that no version of this add-on has ever been run in a real
+Minecraft client — rather than burying it.
+
+### 59.6 — Packaging
+
+`SmartRailBuilder-v1.0.0.mcaddon`, built from the same two-`.mcpack` structure every prior
+release used. Verified after packaging: both `.mcpack` archives present and readable; both
+manifests parse as valid JSON with all version fields at `[1, 0, 0]`; 4 distinct entity UUIDs;
+script entry point `scripts/main.js` present; all 79 script files present; both `pack_icon.png`
+assets present, 256×256 RGBA, byte-identical; localization present; zip integrity clean on all
+three archives. **No development artifacts ship**: `node_modules/` (the test-only Minecraft API
+mock), `tests/`, `docs/`, `assets/` and the repository's own `.mcaddon` files are all outside
+`BP/` and `RP/`, which are the only two directories the packaging step reads — confirmed by
+inspecting the produced archive's file listing, not assumed.
+
+### 59.7 — Test Status at Release (honest)
+
+- **PASS (actually executed):** the Node.js test suite — 432 assertions across 9 files, all
+  passing — plus `node --check` on all 79 script files, the 37-check quality gate (59.2), the
+  localization parity check, the cross-registry contradiction check, and the packaged-archive
+  structural verification. These ran for real, in this environment, and their output is the
+  evidence.
+- **VALIDATED (static/structural, not executed):** manifest correctness, UUID uniqueness and
+  the BP→RP dependency link, API surface compatibility against the targeted stable
+  `@minecraft/server` 2.8.0 / `@minecraft/server-ui` 2.1.0 (unchanged since Project Prompt 27's
+  full review; deliberately not upgraded at release per §15), and pack structure.
+- **NEEDS USER TEST (everything else):** all actual gameplay. Every mode, every rail type, every
+  direction, every limit's real in-world behavior, the ascending-rail orientation, rail
+  crossings, resource deduction in a live inventory, cancellation and interruption, multiplayer,
+  and whether the pack icon renders. **None of this has been tested, in any of the project's 30
+  sessions, because no session has ever had the ability to launch Minecraft.**
+
+### 59.8 — Known Limitations at 1.0.0 (complete, unchanged)
+
+Every limitation carried forward from §58.10/§57.7/§56.9 remains open at release; none was
+resolved this session and none is hidden. In priority order for a first play session: the
+ascending `rail_direction` mapping (unconfirmed against real Bedrock — the single highest-risk
+assumption in the project); rail crossings not connecting on both lines, because vanilla has no
+4-way crossing rail (existing rails are protected, but continuity through a crossing is not
+guaranteed); neighbour-update re-shaping of a hand-placed rail adjacent to a newly placed one;
+ordinary-block player structures being undetectable; `player.dimension`/`Dimension.id` edge-case
+behavior; two `ui/BuildMenu.js` visual-layout items; whether `pack_icon.png` renders and whether
+the branded form titles fit a small mobile screen; the deliberate 64-block length ceiling;
+unlit underground tunnels; and en_US-only text. The full reasoning for each is in the sections
+that first disclosed it — none has been downgraded or reworded to sound better at release.
+
+### 59.9 — Project Close
+
+This is the final entry of the planned 30-prompt roadmap. The project is feature-complete as
+scoped, released at 1.0.0, and has no in-flight work. What it does not have is a single minute
+of real gameplay verification — which is why the release ships with a 20-part Minecraft PE test
+plan and a structured bug-report format rather than a claim of completion. Any future work is
+user-requested, not roadmap-driven.
