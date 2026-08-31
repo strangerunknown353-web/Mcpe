@@ -70,6 +70,9 @@ const STAGE_ENTRY_LIFECYCLE_STATE = Object.freeze({
   TerrainScanningStage: RequestLifecycleState.VALIDATING,
   InventoryStage: RequestLifecycleState.VALIDATING,
   FinalSafetyCheckStage: RequestLifecycleState.VALIDATING,
+  // Added Project Prompt 22 — the final revalidation + BuildPlan assembly
+  // stage, still squarely part of "checking, not yet building."
+  BuildPlanStage: RequestLifecycleState.VALIDATING,
   PlacementStage: RequestLifecycleState.READY,
   CompletionStage: RequestLifecycleState.COMPLETED,
 });

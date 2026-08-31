@@ -4656,3 +4656,218 @@ outcome and the correct `localizationKey`, both unaffected.
   across any of its now-21 sessions. This session's own instructions were explicit that
   claiming otherwise would be dishonest; every "Validation Performed" section in this
   document, across every prior session, has said the same thing for the same reason.
+
+## 51. Smart Build Preview, Validation & Safety (Roadmap Phase 22, Project Prompt 22)
+
+### 51.1 — Scope: Consolidate and Harden, Not Redesign
+
+This session's brief asked for a "complete build plan" assembled before construction, a
+world modification boundary, clearer validation error categories, and closed the last real
+async-staleness gap — all explicitly on top of the EXISTING pipeline
+(`RailDetectionStage → BuildRequestCreationStage → ValidationStage → ModeAvailabilityStage →
+TerrainScanningStage → InventoryStage → FinalSafetyCheckStage → PlacementStage →
+CompletionStage`), which the prompt itself asked to keep. Two new stages/classes were added
+(`BuildPlanStage`, inserted between `FinalSafetyCheckStage` and `PlacementStage`; the
+`BuildPlan` class it constructs), one small new safety class (`ActiveBuildRegistry`), and one
+real, found-and-fixed bug (`ResourceValidator`'s hardcoded rejection reason). Nothing about
+mode config, UI flow, or the pipeline's overall order changed.
+
+### 51.2 — Real Bug Found and Fixed: `ResourceValidator`'s Hardcoded Reason String
+
+`inventory/ResourceValidator.js`'s `validate()` always returned `reason: "INSUFFICIENT_RAILS"`
+on a shortfall — including for the BRIDGE material check, which calls the exact same method a
+second time with a material report instead of a rail report. This was a real, if harmless (the
+player-facing `.lang` message was still selected correctly by the CALLER's own
+`localizationKey` argument, not by this reason string), inconsistency: any code inspecting
+`result.reason` — this session's own new `ValidationErrorCategory.categorize()` included —
+would have mis-read a material shortfall as a rail shortfall. Fixed by adding an optional
+`resourceKind` parameter (`"RAILS"` default, `"MATERIAL"` for the bridge check), so
+`InventoryStage`'s two call sites and `BuildPlanStage`'s two equivalent re-checks now report
+the true reason.
+
+### 51.3 — `BuildPlan`: A Consolidation, Not a New Scan
+
+`core/BuildPlan.js` is the "complete build plan" Project Prompt 22 §1 asked for — rail type,
+mode, direction, length, start/end position, rail positions, terrain info, bridge/underground
+specifics, required rails/material, and a validation-results summary. Every field is read
+directly from what the pipeline had ALREADY computed by the time `BuildPlanStage` runs
+(`context.terrainReport`/`bridgePlan`/`undergroundPlan`, already fresh from
+`FinalSafetyCheckStage`'s own re-scan) — `BuildPlan.fromContext()` calls no scanning class
+itself. This directly satisfies §12's "avoid duplicate terrain scans... recalculating the
+same positions": the plan is pure reshaping.
+
+**"Do not count the same block twice" (§5), concretely proven, not just claimed** — the new
+`tests/buildPlanSafety.test.mjs` (§51.9) asserts the world modification boundary's exact
+`Set` size for all three modes, including UNDERGROUND, where a rail position is ALSO the
+first entry of that same step's own `excavationPositions` (see `terrain/UndergroundPlan.js`'s
+`UndergroundRailStep` doc) — the boundary's `Set` correctly collapses that overlap rather than
+inflating its size, confirmed by comparing against an independently-computed expected unique
+count, not a hardcoded number. Resource COUNTS themselves were never at risk of double-counting
+— `BridgePlan.requiredSupportBlockCount` was already `supportPositions.length +
+surfacePositions.length`, two lists that never overlap by construction (see that file's own
+doc) — this session only confirmed and tested that guarantee, it did not need to fix anything
+there.
+
+### 51.4 — The World Modification Boundary (§7): An Inspectable Existing Guarantee, Not a New Gate
+
+`BuildPlan.modificationBoundary` is the exact, closed set of positions a build may touch.
+Tracing all three execution strategies (`StraightRailStrategy`, `BridgeExecutionStrategy`,
+`UndergroundExecutionStrategy`) confirms none of them computes a position independently of the
+plan/path object handed to it by `PlacementStage` — every position placed comes directly from
+`context.terrainReport.positions`/`context.bridgePlan`/`context.undergroundPlan`, the exact
+same sources `BuildPlan.fromContext()` reads. So the boundary does not change what can be
+placed; it makes an already-true structural guarantee into a concrete, testable value — and
+gives `ActiveBuildRegistry` (§51.6) something real to claim.
+
+### 51.5 — Terrain / Mode-Specific / Existing-Rail Validation (§3/§4/§6): Confirmed Adequate, Not Rewritten
+
+Every check Project Prompt 22 §3/§4 lists (terrain height, obstacles, existing blocks/rails,
+water, lava, unbreakable blocks, clearance, chunk availability; Bridge's height/ascent/
+structure/support/material/water/terrain-connection; Underground's depth/world-limits/tunnel-
+path/clearance/excavation/water/lava/unbreakable/entrance/exit) is already implemented across
+`terrain/TerrainScanner.js`, `terrain/PathValidator.js`, `terrain/BridgeValidation.js`, and
+`terrain/UndergroundValidation.js` — built up across Project Prompts 5, 11, 12, 16, 17, 18, 19,
+and re-confirmed correct rather than re-implemented this session (re-implementing working,
+tested checks the prompt itself didn't report a defect in would be exactly the "rebuild the
+engine" this session's own scope explicitly excluded). §6's "never silently destroy another
+railway" is likewise already true: `RAIL_ITEM_ID_SET`-based preservation (Project Prompt 19)
+already treats an existing rail as never-overwritten in all three modes — the "safely adapt the
+plan" §6 allows for is exactly this existing preservation, not a new capability.
+
+### 51.6 — Multiplayer Safety (§11): `ActiveBuildRegistry`, a Real New Capability
+
+Before this session, nothing prevented two players' builds from targeting overlapping
+positions — `CancellationWatcher` tracks per-player session cancellation, but never checked
+whether two DIFFERENT players' claimed areas overlapped. `core/ActiveBuildRegistry.js` closes
+this: `PlacementStage` claims `context.buildPlan.modificationBoundary` (keyed by `player.id`)
+immediately before calling `RailBuilder.run()`, and releases it in the same `finally` block that
+already unregisters the session from `CancellationWatcher` — so a claim is freed whether the
+build completes, is cancelled, or throws. A conflicting claim is rejected with `RAIL_CONFLICT`
+BEFORE `railBuilder.run()` is ever called — zero blocks placed, proven directly in
+`tests/buildPlanSafety.test.mjs` with a stub `railBuilder` that throws if `.run()` is ever
+invoked.
+
+**Why this is race-free without a lock**: the check (does any position already belong to a
+different owner) and the claim (record this owner against every position) happen together, in
+one synchronous method call, before the one `await` in `PlacementStage.execute()`. The Bedrock
+scripting engine runs all synchronous code for one event/tick to completion before another
+player's code can interleave, so there is no window between "checked" and "claimed" a second
+build could slip through.
+
+### 51.7 — Async State Revalidation (§10): The One Real Remaining Gap, Closed
+
+Before this session, `ValidationStage`'s validators (player/game mode/held item/direction/
+origin/length/mode config/permission) all ran exactly once, early — and `InventoryStage`'s
+resource check ran once too. `FinalSafetyCheckStage` already re-scanned terrain/bridge/
+underground plans immediately before placement, but nothing re-checked player validity,
+dimension, held item, or inventory at that same late moment, despite real time (a terrain
+scan, an inventory build, a fresh plan) having passed since they were last checked. Everything
+ELSE §10 lists (Length/Mode/Height/Depth) was confirmed to need no re-check: `BuildRequest` is
+immutable once constructed (see core/BuildRequest.js), so those values cannot go stale — only
+whether they're STILL SAFE given current world state can, and that's exactly what
+`FinalSafetyCheckStage`'s fresh re-plan already re-confirms.
+
+`core/pipeline/stages/BuildPlanStage.js` (new, runs immediately after `FinalSafetyCheckStage`)
+closes the remaining gap: re-checks `player.isValid`, `player.dimension` against the
+originally-captured `request.dimension`, the held item against `request.railTypeId`, and a
+fresh inventory read against the already-known required quantities (no new terrain scan — see
+§51.8 for why this isn't wasteful duplication). Any failure here means ZERO blocks placed,
+proven by `tests/buildPlanSafety.test.mjs`'s Sections 5-8.
+
+### 51.8 — Performance (§12): Why a Fresh Inventory Read Here Isn't "Repeated Scanning"
+
+`BuildPlanStage`'s inventory re-check reads the SAME already-known required quantities a
+second time — no new terrain scan, no new `planBridge()`/`planUnderground()` call, no
+recalculation of any position. This mirrors `FinalSafetyCheckStage`'s own terrain re-scan
+exactly: neither is "duplicate work that should have been avoided," both are "the same cheap
+check, run exactly twice, at the two moments that actually matter" — once when the request is
+made, once immediately before it becomes irreversible. `BuildPlan.fromContext()` itself does
+zero scanning (§51.3). No new object is created per rail position beyond what `BuildPlan`'s own
+arrays and boundary `Set` already need once, at construction.
+
+### 51.9 — Testing (§14): `tests/buildPlanSafety.test.mjs`
+
+59 new assertions, covering: `BuildPlan.fromContext()` for all three modes (fields, boundary
+size, no double-counting — §51.3); `ActiveBuildRegistry` claim/conflict/release in isolation;
+`BuildPlanStage`'s four rejection paths (player disconnected, dimension changed, item swapped,
+inventory gone stale) plus its success path; `PlacementStage`'s `RAIL_CONFLICT` rejection
+end-to-end, with a throwing stub proving `railBuilder.run()` is never called; a spot-check of
+`ValidationErrorCategory.categorize()`'s mapping table; and `BuildOrchestrator`'s new
+"STATUS: CANNOT BUILD" chat-message ordering. `mockPlayer.mjs` gained `setHeldItem()`/
+`setDimension()` (same pattern as the existing `setGameMode()`), and `mockWorld.mjs`'s
+`createMockDimension()` gained an optional `id` (defaulting to the same value everywhere, so no
+pre-existing test's behavior changed) — both additive, both needed to simulate the exact
+staleness `BuildPlanStage` now catches.
+
+### 51.10 — Regression (§15): All Prior Suites Still Pass
+
+`node --check` across all 79 script files (5 more than before this session), and the full
+existing suite (`water.test.mjs`, `terrain.test.mjs`, `execution.test.mjs`,
+`integration.test.mjs`, `uiMenu.test.mjs` — 216 assertions, unchanged) all still pass
+unmodified — including `integration.test.mjs`'s three full NORMAL/BRIDGE/UNDERGROUND success
+runs, which now also incidentally prove `BuildPlanStage` doesn't reject a legitimate,
+unmodified build. `LocalizationKeys`↔`.lang` cross-check: 0 missing, 0 orphaned.
+
+### 51.11 — Validation Error Categories (§9): A Mapping Layer, Not a Rewrite
+
+`config/ValidationErrorCategory.js` maps every existing internal `reason` string (across
+`core/validation/*.js`, `PathRejectionReason`, `BridgeRejectionReason`,
+`UndergroundRejectionReason`, `ResourceValidator`, and this session's own new reasons) to
+exactly one of the prompt's 13 named categories, without renaming or replacing any of the
+existing, already-good `.lang` messages those reasons already drive. A few reasons don't map
+cleanly onto any one category (e.g. a water-crossing rejection, a protected-ore rejection) —
+these are mapped to the closest fit (`UNSAFE_TERRAIN`) and stated plainly as approximations in
+the file's own header, rather than inventing categories outside the prompt's given list.
+`BuildOrchestrator.js`'s new "STATUS: CANNOT BUILD" chat line (§8) is sent once, before the
+specific reason, for every outcome that means zero world modification — deliberately NOT sent
+for a `PLACEMENT_INCOMPLETE` stop (some rails were kept, so "CANNOT BUILD" would misrepresent
+it) or for a `CANCELLED` menu-close (nothing went wrong, the player just closed a form).
+
+### 51.12 — Build Summary (§8): The Confirmation Screen Stays a Preview, By Design
+
+The prompt's own example shows an exact "Required Blocks: 84" on the pre-confirmation summary
+screen. Project Prompt 21 deliberately resolved NOT to compute Bridge Mode's real material
+count before that screen, since doing so would mean running `planBridge()`'s full route scan
+just to draw a form — directly violating this session's OWN Performance requirement
+(§12/§51.8). That resolution is unchanged this session: the summary still shows "Required
+Rails" (cheap, already known pre-scan) and "(calculated automatically)" for Bridge material,
+with the REAL number revealed honestly in a chat message once `InventoryStage`/`BuildPlanStage`
+have actually confirmed it (Project Prompt 21's own addition, still in place). This is a
+genuine, acknowledged tension between two of this session's own requirements (§1/§8's exact
+example vs. §12's performance rule) — resolved the same direction as Project Prompt 21, for the
+same reason, rather than silently picking one without saying so.
+
+### 51.13 — Known Limitations (disclosed, not hidden, carried forward from prior sessions)
+
+- **`player.dimension`/`Dimension.id` is new API surface for this project** — every prior
+  session read `player.location`/`player.getRotation()`/inventory components, but never a
+  dimension's own `.id`. This is documented as a real, stable Bedrock API property, but — same
+  disclosure standard as `rail_direction`/`textures/items/<name>` before it — has not been
+  confirmed against a live client. Non-blocking either way: a wrong assumption here would at
+  worst mean a real dimension change is missed by `BuildPlanStage`'s specific check (still
+  caught mid-build by the existing `CancellationWatcher`, unchanged since Project Prompt 2, the
+  moment `PlacementStage` registers a session), never a false rejection of a valid build.
+- The two `ui/BuildMenu.js` visual-confirmation items from Project Prompt 21 (`.body()`
+  substitutions rendering, material button icon paths) and neighbor-update side effects on a
+  pre-existing rail (§48.6) remain unconfirmed without a live client — unchanged, out of scope
+  for this session.
+- **No in-game verification for anything in this or any prior session.** Every claim above is a
+  Node-only, mocked-world verification — see §51.14 and the Minecraft PE test checklist
+  delivered alongside this session's `.mcaddon`.
+
+### 51.14 — Validation Performed
+
+- `node --check` across all 79 script files — 0 failures.
+- **275 assertions across 6 test files, all passing**: 55 (`water.test.mjs`, unchanged), 68
+  (`terrain.test.mjs`, unchanged), 39 (`execution.test.mjs`, unchanged), 29
+  (`integration.test.mjs`, unchanged), 25 (`uiMenu.test.mjs`, unchanged), and 59 new
+  (`buildPlanSafety.test.mjs`).
+- `LocalizationKeys`↔`RP/texts/en_US.lang` cross-check: 0 missing, 0 orphaned keys.
+- The addon's `.mcaddon` was rebuilt and its internal structure verified (manifests parse as
+  valid JSON, all three version fields agree at 0.1.15, both `.mcpack` archives contain a
+  `manifest.json` at their own root, the outer `.mcaddon` contains exactly the two `.mcpack`
+  files) — see the delivered file and this session's final report for the exact result.
+- **Not yet confirmed in-game** — nothing in this project has been play-tested by a human
+  across any of its now-22 sessions. This session's own instructions were explicit that
+  claiming otherwise would be dishonest; every "Validation Performed" section in this document,
+  across every prior session, has said the same thing for the same reason.

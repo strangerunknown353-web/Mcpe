@@ -106,9 +106,9 @@ export class BuildOrchestrator {
 
     switch (outcome) {
       case PipelineOutcome.BUILD_ACCEPTED:
-        // Not reachable yet — PlacementStage is still a stub. Roadmap
-        // Phase 9 (Feedback, Progress & Logging Polish) adds a "build
-        // complete" chat message here once it can actually succeed.
+        // Nothing to do here — CompletionStage (the pipeline's final stage,
+        // real since Project Prompt 10) already sent the "build complete"
+        // chat message itself before this method ever runs.
         break;
 
       case PipelineOutcome.CANCELLED:
@@ -130,6 +130,21 @@ export class BuildOrchestrator {
       case PipelineOutcome.VALIDATION_FAILED:
       case PipelineOutcome.TERRAIN_FAILED:
       case PipelineOutcome.INVENTORY_FAILED:
+        // Added Project Prompt 22 §8/§9: a clear "STATUS: CANNOT BUILD"
+        // lead-in before the specific reason, for every outcome that means
+        // literally nothing was modified — matches the confirmation
+        // screen's own "STATUS: READY TO BUILD" framing (ui/BuildMenu.js),
+        // giving the player the same status/reason shape whether the news
+        // is good or bad. Deliberately NOT sent for PLACEMENT_INCOMPLETE
+        // below — that outcome means some rails WERE placed and kept, which
+        // "CANNOT BUILD" would misrepresent; CONSTRUCTION_STOPPED already
+        // says so clearly on its own.
+        if (result.localizationKey) {
+          this._messageService.sendChat(player, LocalizationKeys.STATUS_CANNOT_BUILD);
+          this._messageService.sendChat(player, result.localizationKey, result.substitutions);
+        }
+        break;
+
       case PipelineOutcome.PLACEMENT_INCOMPLETE:
         if (result.localizationKey) {
           this._messageService.sendChat(player, result.localizationKey, result.substitutions);

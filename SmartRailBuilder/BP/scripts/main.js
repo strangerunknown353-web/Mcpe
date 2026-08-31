@@ -71,8 +71,10 @@ import { ModeAvailabilityStage } from "./core/pipeline/stages/ModeAvailabilitySt
 import { TerrainScanningStage } from "./core/pipeline/stages/TerrainScanningStage.js";
 import { InventoryStage } from "./core/pipeline/stages/InventoryStage.js";
 import { FinalSafetyCheckStage } from "./core/pipeline/stages/FinalSafetyCheckStage.js";
+import { BuildPlanStage } from "./core/pipeline/stages/BuildPlanStage.js";
 import { PlacementStage } from "./core/pipeline/stages/PlacementStage.js";
 import { CompletionStage } from "./core/pipeline/stages/CompletionStage.js";
+import { ActiveBuildRegistry } from "./core/ActiveBuildRegistry.js";
 
 import { ValidationManager } from "./core/validation/ValidationManager.js";
 import { PlayerValidator } from "./core/validation/PlayerValidator.js";
@@ -154,6 +156,7 @@ function buildDependencyGraph() {
   const railBuilder = new RailBuilder(); // Project Prompt 16 — no longer bound to one strategy at construction, see builder/RailBuilder.js
   const bridgeValidation = new BridgeValidation(); // Project Prompt 16
   const undergroundValidation = new UndergroundValidation(); // Project Prompt 17
+  const activeBuildRegistry = new ActiveBuildRegistry(); // Project Prompt 22 — multiplayer position-conflict claims, see core/ActiveBuildRegistry.js
 
   // --- Validation framework: one validator per concern, order matters
   // (cheapest/most-fundamental checks first). ---
@@ -180,7 +183,8 @@ function buildDependencyGraph() {
     new TerrainScanningStage(terrainScanner, pathValidator, messageService, bridgeValidation, undergroundValidation),
     new InventoryStage(inventoryManager, resourceValidator, messageService),
     new FinalSafetyCheckStage(terrainScanner, messageService),
-    new PlacementStage(railBuilder, cancellationWatcher, messageService, strategiesByMode),
+    new BuildPlanStage(inventoryManager, resourceValidator), // Project Prompt 22 — final revalidation + context.buildPlan
+    new PlacementStage(railBuilder, cancellationWatcher, messageService, strategiesByMode, activeBuildRegistry),
     new CompletionStage(messageService),
   ]);
 

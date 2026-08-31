@@ -155,7 +155,7 @@ export class InventoryStage {
     const report = this._inventoryManager.buildReport(player, railTypeId, requiredLength);
     context.inventoryCheck = report;
 
-    const validation = this._resourceValidator.validate(report, gameMode);
+    const validation = this._resourceValidator.validate(report, gameMode, "RAILS");
 
     if (!validation.valid) {
       Logger.debug(
@@ -189,7 +189,7 @@ export class InventoryStage {
 
     const railReport = this._inventoryManager.buildReport(player, railTypeId, plan.requiredRailCount);
     context.inventoryCheck = railReport;
-    const railValidation = this._resourceValidator.validate(railReport, gameMode);
+    const railValidation = this._resourceValidator.validate(railReport, gameMode, "RAILS");
     if (!railValidation.valid) {
       Logger.debug(
         `Bridge inventory check failed for ${player.name} (rails): ${railValidation.reason} ` +
@@ -206,7 +206,7 @@ export class InventoryStage {
     // per-player value now instead of always the same one.
     const materialReport = this._inventoryManager.buildReport(player, bridgeMaterialId, plan.requiredSupportBlockCount);
     context.bridgeInventoryCheck = materialReport;
-    const materialValidation = this._resourceValidator.validate(materialReport, gameMode);
+    const materialValidation = this._resourceValidator.validate(materialReport, gameMode, "MATERIAL");
     const materialDisplayName = formatBlockDisplayName(bridgeMaterialId);
     if (!materialValidation.valid) {
       Logger.debug(

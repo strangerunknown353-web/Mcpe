@@ -1129,3 +1129,71 @@ consecutive session on a base that has still never been confirmed in-game — se
 - **Not yet confirmed in-game** — this session's own instructions were explicit that
   claiming otherwise without an actual Minecraft launch would be dishonest; none of
   this project's 21 sessions has been play-tested by a human.
+
+### Project Prompt 22 — Smart Build Preview, Validation & Safety — 2026-08-31
+
+- **Added: `core/BuildPlan.js`** — the complete, consolidated build plan (rail type, mode,
+  direction, length, start/end position, rail positions, terrain info, bridge/underground
+  specifics, required rails/material, and a world modification boundary) Project Prompt 22
+  asked for, assembled entirely from data the pipeline had already computed — no new terrain
+  scan, no new planning call. ARCHITECTURE.md §51.3.
+- **Added: `core/pipeline/stages/BuildPlanStage.js`** — new pipeline stage, running
+  immediately after `FinalSafetyCheckStage` and before `PlacementStage`. Closes the one real
+  remaining async-staleness gap: re-checks player validity, dimension, held item, and a fresh
+  inventory read immediately before construction — everything else Project Prompt 22 §10
+  asked to revalidate (length/mode/height/depth) needs no re-check, since `BuildRequest` is
+  immutable once created. Any failure here means zero blocks placed. ARCHITECTURE.md §51.7.
+- **Added: `core/ActiveBuildRegistry.js`** — a new multiplayer safety net. `PlacementStage`
+  now claims a build's exact modification boundary before placing anything; a second
+  player's overlapping build is rejected outright (`RAIL_CONFLICT`, zero blocks placed)
+  rather than silently corrupting the first player's railway. Race-free by construction — the
+  check-and-claim happens synchronously, before the one `await` in `PlacementStage.execute()`.
+  ARCHITECTURE.md §51.6.
+- **Added: `config/ValidationErrorCategory.js`** — maps every existing internal rejection
+  reason (across every validator, `PathRejectionReason`, `BridgeRejectionReason`,
+  `UndergroundRejectionReason`, `ResourceValidator`) onto the prompt's 13 named error
+  categories, without renaming or replacing any existing player-facing message.
+  ARCHITECTURE.md §51.11.
+- **Added: a "STATUS: CANNOT BUILD" chat prefix** (`core/BuildOrchestrator.js`), sent once
+  before the specific reason for every outcome that means zero world modification —
+  deliberately not sent for a partial `PLACEMENT_INCOMPLETE` stop (some rails were kept) or a
+  menu-close cancellation. ARCHITECTURE.md §51.11.
+- **Fixed: `inventory/ResourceValidator.js` always reported `"INSUFFICIENT_RAILS"`** even
+  when checking bridge material — a real, found inconsistency, harmless to players (the
+  correct `.lang` message was still selected by the caller) but misleading to anything
+  inspecting the reason string. Now takes an optional `resourceKind` ("RAILS"/"MATERIAL"),
+  defaulting to the previous behavior for every pre-existing call site. ARCHITECTURE.md §51.2.
+- **Confirmed, not changed**: terrain/mode-specific validation (§3/§4) and existing-rail
+  protection (§6) were already fully implemented across `TerrainScanner`/`PathValidator`/
+  `BridgeValidation`/`UndergroundValidation` and `RAIL_ITEM_ID_SET`'s preservation logic —
+  re-verified, not re-implemented. ARCHITECTURE.md §51.5.
+- **Added: `tests/buildPlanSafety.test.mjs`** (59 new assertions) — `BuildPlan` field
+  assembly and boundary correctness (including a real overlap-deduplication proof for
+  Underground Mode) for all three modes; `ActiveBuildRegistry` claim/conflict/release;
+  `BuildPlanStage`'s four rejection paths; `PlacementStage`'s `RAIL_CONFLICT` rejection with a
+  throwing stub proving placement is never attempted; `ValidationErrorCategory.categorize()`;
+  and the new chat-message ordering. ARCHITECTURE.md §51.9.
+- **Files created:** `BP/scripts/core/BuildPlan.js`, `BP/scripts/core/ActiveBuildRegistry.js`,
+  `BP/scripts/core/pipeline/stages/BuildPlanStage.js`,
+  `BP/scripts/config/ValidationErrorCategory.js`, `BP/scripts/utils/PositionKey.js`,
+  `tests/buildPlanSafety.test.mjs`.
+- **Files modified:** `BP/scripts/inventory/ResourceValidator.js`,
+  `BP/scripts/core/pipeline/stages/InventoryStage.js` (resourceKind passed explicitly),
+  `BP/scripts/core/pipeline/stages/PlacementStage.js` (claim/release, RAIL_CONFLICT),
+  `BP/scripts/core/pipeline/PipelineContext.js` (new `buildPlan` field),
+  `BP/scripts/core/pipeline/PipelineOutcome.js` (RAIL_CONFLICT/BuildPlanStage
+  classification), `BP/scripts/core/BuildOrchestrator.js` (STATUS_CANNOT_BUILD prefix,
+  one stale comment fixed), `BP/scripts/localization/LocalizationKeys.js` +
+  `RP/texts/en_US.lang` (3 new keys), `BP/scripts/main.js` (pipeline wiring),
+  `BP/scripts/core/pipeline/BuildPipeline.js` (lifecycle state entry),
+  `tests/integration.test.mjs` + `tests/mockPlayer.mjs` + `tests/mockWorld.mjs` (mirrored
+  wiring, new `setHeldItem()`/`setDimension()`/dimension `id`), `tests/README.md`,
+  `config/Constants.js` + both manifests (version 0.1.14 → 0.1.15).
+- **Packaged a new, testable `.mcaddon`** — version 0.1.15, structure verified (manifests
+  valid, all three version references agree, both `.mcpack` archives correctly rooted,
+  `.mcaddon` contains exactly the 2 expected `.mcpack` files).
+- **Validation:** 275 assertions across 6 test files (216 unchanged + 59 new), all passing.
+  `node --check` clean across all 79 script files. Full detail in ARCHITECTURE.md §51.14.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of
+  this project's 22 sessions has been play-tested by a human.

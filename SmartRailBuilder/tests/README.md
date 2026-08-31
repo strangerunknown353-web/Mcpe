@@ -16,6 +16,7 @@ node tests/terrain.test.mjs
 node tests/execution.test.mjs
 node tests/integration.test.mjs
 node tests/uiMenu.test.mjs
+node tests/buildPlanSafety.test.mjs
 ```
 
 No dependencies, no build step — plain Node (22+), ESM (`.mjs`).
@@ -168,6 +169,31 @@ new `@minecraft/server-ui` mock:
   distinguished outcomes — the "no accidental construction" contract.
 - Multiplayer isolation: two players' scripted mode-screen responses,
   queued and shown concurrently, never cross-contaminate.
+
+`buildPlanSafety.test.mjs` (Project Prompt 22) — the new Build Plan/safety
+layer, unlocked by running the real `TerrainScanningStage`/`InventoryStage`/
+`FinalSafetyCheckStage` directly (no full pipeline needed) then mutating the
+mock player before calling the new stage under test:
+- `core/BuildPlan.js`: field assembly for all three modes, the world
+  modification boundary's size (flat NORMAL: exactly one entry per rail;
+  BRIDGE: rails + support positions with no unexpected overlap; UNDERGROUND:
+  correctly deduplicates rail positions that are ALSO excavation positions,
+  rather than double-counting them).
+- `core/ActiveBuildRegistry.js`: claim/conflict/release in isolation.
+- `core/pipeline/stages/BuildPlanStage.js`: each of its 4 new
+  immediately-before-construction re-checks (player disconnected, dimension
+  changed, held item swapped, rails vanished from inventory) rejected
+  correctly, plus its success path attaching a real `context.buildPlan`.
+- `core/pipeline/stages/PlacementStage.js`'s RAIL_CONFLICT rejection: two
+  overlapping claims, proving `railBuilder.run()` is never even called (a
+  throwing stub stands in for it) and nothing is placed in the world.
+- `config/ValidationErrorCategory.js`'s `categorize()` mapping.
+- `core/BuildOrchestrator.js`'s new "STATUS: CANNOT BUILD" chat prefix,
+  sent before the specific reason for a real rejection.
+
+`node_modules/@minecraft/server-ui/`'s mock (Project Prompt 21) needed no
+changes for this session's work — BuildPlanStage/BuildPlan/ActiveBuildRegistry
+have no UI surface of their own.
 
 ## What's NOT covered (known gaps, not solved this session)
 

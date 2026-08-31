@@ -52,6 +52,12 @@ export function createMockPlayer({
   }
 
   let currentGameMode = gameMode;
+  // Added Project Prompt 22 (BuildPlanStage revalidation tests): lets a test
+  // simulate a player swapping items — or a dimension change — between
+  // planning and the final pre-construction check, the same way
+  // `setGameMode` already simulates a mid-build game mode change.
+  let currentHeldItemTypeId = heldItemTypeId;
+  let currentDimension = dimension;
   // Added Project Prompt 20 (full-pipeline integration test): every message
   // MessageService sends is recorded here rather than silently swallowed —
   // MessageService already catches a missing sendMessage/onScreenDisplay
@@ -71,8 +77,13 @@ export function createMockPlayer({
     // ValidationManager entirely, so this was never previously needed.
     isValid,
     // Added Project Prompt 20: BuildRequestCreationStage reads
-    // `player.dimension` directly when constructing a BuildRequest.
-    dimension,
+    // `player.dimension` directly when constructing a BuildRequest. A
+    // getter (Project Prompt 22) so `setDimension()` below is actually
+    // visible on the next read, the same way `getGameMode()` already
+    // reflects `setGameMode()`.
+    get dimension() {
+      return currentDimension;
+    },
     location,
     /** TEST-ONLY: every {translate, with} payload sent via sendMessage(), in order. */
     sentChatMessages,
@@ -96,6 +107,14 @@ export function createMockPlayer({
     setGameMode(mode) {
       currentGameMode = mode;
     },
+    /** TEST-ONLY convenience (Project Prompt 22): simulate the player swapping their held item. */
+    setHeldItem(typeId) {
+      currentHeldItemTypeId = typeId;
+    },
+    /** TEST-ONLY convenience (Project Prompt 22): simulate a dimension change. */
+    setDimension(newDimension) {
+      currentDimension = newDimension;
+    },
     getComponent(componentId) {
       if (componentId === "minecraft:inventory") {
         return { container };
@@ -103,7 +122,7 @@ export function createMockPlayer({
       if (componentId === "minecraft:equippable") {
         return {
           getEquipment() {
-            return heldItemTypeId ? { typeId: heldItemTypeId } : undefined;
+            return currentHeldItemTypeId ? { typeId: currentHeldItemTypeId } : undefined;
           },
         };
       }

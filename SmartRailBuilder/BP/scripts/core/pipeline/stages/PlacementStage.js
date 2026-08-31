@@ -47,6 +47,21 @@ import { BuildingMode } from "../../../config/BuildModes.js";
  *   is `context.bridgePlan` directly — exactly what BridgeValidation
  *   approved, nothing recomputed here.
  *
+ * PROJECT PROMPT 22 ADDITION: MULTIPLAYER CONFLICT CLAIM (§7/§11)
+ *   Immediately before calling `railBuilder.run()` — after the session is
+ *   constructed but before the one `await` in this method — this stage now
+ *   claims `context.buildPlan.modificationBoundary` (see core/BuildPlan.js)
+ *   from `core/ActiveBuildRegistry.js`. If any position is already claimed
+ *   by a DIFFERENT player's active build, this stage rejects with
+ *   `RAIL_CONFLICT` and NEVER calls `railBuilder.run()` — zero blocks
+ *   placed, exactly like every other pre-placement rejection. The claim is
+ *   released in the same `finally` block that already unregisters the
+ *   session from CancellationWatcher, so it's always freed whether the
+ *   build finishes, is cancelled, or throws. See ActiveBuildRegistry.js's
+ *   own header for why doing the check-and-claim together, synchronously,
+ *   right here (rather than in an earlier, separate stage) is what makes
+ *   this race-free.
+ *
  * RESPONSIBILITIES
  *   - Send one chat message right before construction starts — the
  *     player's cue that a potentially multi-tick operation is beginning
@@ -56,6 +71,9 @@ import { BuildingMode } from "../../../config/BuildModes.js";
  *     `context.terrainReport.positions` (NORMAL) or `context.bridgePlan`
  *     (BRIDGE) — see the bug fix notes above for why this stage must not
  *     recompute either.
+ *   - Claim `context.buildPlan.modificationBoundary` before placing anything;
+ *     reject with RAIL_CONFLICT (no blocks placed) if another active build
+ *     already holds any of those positions (Project Prompt 22).
  *   - Construct and register a BuildSession for the duration of the build,
  *     always unregistering it afterward (try/finally) even if placement throws.
  *   - Never place a block itself, never touch UI beyond the one message
@@ -67,6 +85,7 @@ import { BuildingMode } from "../../../config/BuildModes.js";
  *   - builder/RailBuilder.js
  *   - core/BuildSession.js
  *   - core/CancellationWatcher.js
+ *   - core/ActiveBuildRegistry.js (Project Prompt 22)
  *   - ui/MessageService.js (injected)
  *   - utils/DirectionUtils.js
  *   - localization/LocalizationKeys.js
@@ -82,8 +101,10 @@ export class PlacementStage {
    * @param {import("../../../ui/MessageService.js").MessageService} messageService
    * @param {Readonly<Record<string, import("../../../builder/strategies/RailBuildStrategy.js")>>} strategiesByMode
    *   Added Project Prompt 16 — see ROADMAP PHASE 16 CHANGE above.
+   * @param {import("../../ActiveBuildRegistry.js").ActiveBuildRegistry} activeBuildRegistry
+   *   Added Project Prompt 22 — see MULTIPLAYER CONFLICT CLAIM above.
    */
-  constructor(railBuilder, cancellationWatcher, messageService, strategiesByMode) {
+  constructor(railBuilder, cancellationWatcher, messageService, strategiesByMode, activeBuildRegistry) {
     this.name = "PlacementStage";
     /** @private */
     this._railBuilder = railBuilder;
@@ -93,6 +114,8 @@ export class PlacementStage {
     this._messageService = messageService;
     /** @private */
     this._strategiesByMode = strategiesByMode;
+    /** @private */
+    this._activeBuildRegistry = activeBuildRegistry;
   }
 
   /**
@@ -142,6 +165,18 @@ export class PlacementStage {
         actualLength,
         DirectionUtils.toDisplayName(buildVector.direction),
       ]);
+    }
+
+    // Project Prompt 22 §7/§11: claim every position this build will touch
+    // before placing anything. Synchronous, right here, before the one
+    // `await` below — see this file's MULTIPLAYER CONFLICT CLAIM doc for why
+    // that makes the check-and-claim race-free without any lock.
+    const claimResult = this._activeBuildRegistry.claim(player.id, context.buildPlan.modificationBoundary);
+    if (!claimResult.claimed) {
+      Logger.warn(
+        `Placement rejected for ${player.name}: ${claimResult.conflictingKeys.length} position(s) already claimed by another active build.`
+      );
+      return PipelineResult.validationFailed(this.name, "RAIL_CONFLICT", LocalizationKeys.VALIDATION_RAIL_CONFLICT);
     }
 
     const session = new BuildSession(request, actualLength);
@@ -195,6 +230,7 @@ export class PlacementStage {
       );
     } finally {
       this._cancellationWatcher.unregisterSession(player.id);
+      this._activeBuildRegistry.release(player.id);
     }
   }
 }

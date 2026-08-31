@@ -161,4 +161,18 @@ export const LocalizationKeys = Object.freeze({
   CONSTRUCTION_PROGRESS: "ryzenRailBuilder.construction.progress",
   CONSTRUCTION_COMPLETE: "ryzenRailBuilder.construction.complete",
   GENERIC_ERROR: "ryzenRailBuilder.error.generic",
+
+  // --- Project Prompt 22: Smart Build Preview, Validation & Safety ---
+  // Sent once, right before the specific rejection reason, for every
+  // outcome that means zero world modification — see BuildOrchestrator.js's
+  // _reportResult().
+  STATUS_CANNOT_BUILD: "ryzenRailBuilder.status.cannotBuild",
+  // BuildPlanStage's own immediately-before-construction revalidation
+  // (§10) — dimension is the one re-check with no existing message to
+  // reuse (item/inventory staleness reuse VALIDATION_ITEM_CHANGED /
+  // INVENTORY_INSUFFICIENT* unchanged).
+  VALIDATION_DIMENSION_CHANGED: "ryzenRailBuilder.validation.dimensionChanged",
+  // PlacementStage's multiplayer conflict rejection (§7/§11) — see
+  // core/ActiveBuildRegistry.js.
+  VALIDATION_RAIL_CONFLICT: "ryzenRailBuilder.validation.railConflict",
 });

@@ -94,7 +94,7 @@ export const LAVA = Object.freeze({ typeId: "minecraft:lava", isLiquid: true });
  * @param {ReadonlyArray<string>} [options.unloaded] "x,y,z" keys that simulate an unloaded chunk (readBlock() -> UNLOADED).
  * @param {ReadonlyArray<string>} [options.outOfBounds] "x,y,z" keys that simulate outside world height bounds (readBlock() -> OUT_OF_BOUNDS).
  */
-export function createMockDimension({ groundY = 63, overrides = {}, unloaded = [], outOfBounds = [] } = {}) {
+export function createMockDimension({ groundY = 63, overrides = {}, unloaded = [], outOfBounds = [], id = "minecraft:overworld" } = {}) {
   const unloadedSet = new Set(unloaded);
   const outOfBoundsSet = new Set(outOfBounds);
   // Added Project Prompt 19: a real, persistent block store. Planning-side
@@ -110,6 +110,12 @@ export function createMockDimension({ groundY = 63, overrides = {}, unloaded = [
   const blocks = new Map();
 
   return {
+    // Added Project Prompt 22 (BuildPlanStage's dimension-changed
+    // revalidation): real Dimension objects expose a stable `.id`
+    // (e.g. "minecraft:overworld") — this mock now does too, defaulting to
+    // the same value for every dimension unless a test explicitly gives two
+    // different ones, so no pre-existing test's behavior changes.
+    id,
     getBlock(position) {
       const key = `${position.x},${position.y},${position.z}`;
 

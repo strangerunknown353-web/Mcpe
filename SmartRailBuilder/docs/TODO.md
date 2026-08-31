@@ -32,6 +32,13 @@
    planning-algorithm suite and a real end-to-end integration suite, see
    ARCHITECTURE.md §44.9) but never run against a live client. Full checklist:
    ROADMAP.md's Phase 16 entry.
+7. **`player.dimension`/`Dimension.id` — please verify visually (Project Prompt 22).** New
+   pipeline stage `BuildPlanStage` reads a dimension's own `.id` for the first time in this
+   project's history, to detect a player changing dimension immediately before construction.
+   Documented as a real, stable Bedrock API property, but not previously exercised anywhere
+   in this codebase. Non-blocking if wrong: at worst this specific check misses a dimension
+   change, still caught mid-build by the existing, unchanged `CancellationWatcher`. See
+   ARCHITECTURE.md §51.13.
 
 ## Resolved Questions — Summary (full detail in ARCHITECTURE.md, sections noted)
 - **Prompts 2, 4-9** (§§2, 15, 17, 19, 21, 23-24, 27): see prior TODO history in
@@ -544,6 +551,36 @@ genuine regression evidence, just not a re-run of the original files byte-for-by
       side effects on a pre-existing rail (§48.6) remain unconfirmable without a live
       client.
 
+## Completed — Roadmap Phase 22: Smart Build Preview, Validation & Safety ✅
+- [x] **Added `core/BuildPlan.js`** — the complete, consolidated build plan (positions,
+      terrain info, required rails/material, world modification boundary), assembled from
+      data the pipeline had already computed — no new scans. §51.3.
+- [x] **Added `core/pipeline/stages/BuildPlanStage.js`** — the last real
+      immediately-before-construction gap, closed: re-checks player validity, dimension,
+      held item, and a fresh inventory read right before `PlacementStage`. Zero blocks
+      placed on any failure. §51.7.
+- [x] **Added `core/ActiveBuildRegistry.js`** — new multiplayer safety net: two players'
+      overlapping builds are now rejected outright (`RAIL_CONFLICT`), never silently
+      corrupting each other. Race-free by construction. §51.6.
+- [x] **Added `config/ValidationErrorCategory.js`** — every existing rejection reason
+      mapped onto the prompt's 13 named categories, without touching any existing
+      player-facing message. §51.11.
+- [x] **Added a "STATUS: CANNOT BUILD" chat prefix** for every real, zero-modification
+      rejection. §51.11.
+- [x] **Fixed a real bug**: `ResourceValidator` always reported "INSUFFICIENT_RAILS" even
+      for a bridge material shortfall — harmless to players, misleading to anything
+      inspecting the reason. §51.2.
+- [x] **Confirmed, not rewritten**: terrain/mode-specific validation and existing-rail
+      protection were already fully implemented — re-verified against the prompt's own
+      checklist. §51.5.
+- [x] 59 new assertions (`tests/buildPlanSafety.test.mjs`), 275 total across 6 files, all
+      passing. `node --check` clean across 79 script files.
+- [x] **New `.mcaddon` packaged, version 0.1.15** — structure verified.
+- [ ] **Awaiting your in-game test pass** — full numbered checklist delivered alongside the
+      `.mcaddon` in this session's final report. Same standing limitations as prior
+      sessions, plus one new one (§51.13): `player.dimension`/`Dimension.id` is new API
+      surface for this project, not previously exercised — see flag #7 above.
+
 ## ⚠️ Order Note (Pre-Prompt-18 Bug-Fix Pass)
 Uploaded with four specific bug reports and four screenshots, explicitly instructing
 "DO NOT START PROJECT PROMPT 18 YET." Honored — Project Prompt 18 was not started.
@@ -557,16 +594,18 @@ broken, the packaging fix (bugfix session) and the `.mcaddon` import itself rema
 right place to start ruling things out first, since nothing else can be verified until
 that works.
 
-## Up Next — Roadmap Phase 22+ (not started)
-Per Project Prompt 21's own scope limit (UI/text polish only, no engine rebuild), the
-backlog is unchanged from before this session except that the `@minecraft/server-ui`
-test mock is now done (§50.9). See ROADMAP.md's Phase 22+ backlog: underground tunnel
-lighting (ARCHITECTURE.md §45.12), the two water-specific follow-ups (ARCHITECTURE.md
-§47.10), curved rails, undo, blueprint save/load, and the rest. Project Prompt 22 itself,
-whenever it arrives, is milestone-gated on your test pass of THIS session, per the
-project's standing workflow — including the items no session's tests can confirm without
-a live client: neighbor-update side effects on a pre-existing rail (§48.6), and the two
-`ui/BuildMenu.js` visual-confirmation items (§50.11).
+## Up Next — Roadmap Phase 23+ (not started)
+Per Project Prompt 22's own scope limit (consolidate/harden the existing pipeline, no
+engine rebuild), the backlog is unchanged from before this session except that a real
+world modification boundary now exists (ARCHITECTURE.md §51.4), which is exactly the
+prerequisite an eventual undo system would need. See ROADMAP.md's Phase 23+ backlog:
+underground tunnel lighting (ARCHITECTURE.md §45.12), the two water-specific follow-ups
+(ARCHITECTURE.md §47.10), curved rails, undo, blueprint save/load, and the rest. Project
+Prompt 23 itself, whenever it arrives, is milestone-gated on your test pass of THIS
+session, per the project's standing workflow — including the items no session's tests can
+confirm without a live client: neighbor-update side effects on a pre-existing rail
+(§48.6), the two `ui/BuildMenu.js` visual-confirmation items (§50.11), and
+`player.dimension`/`Dimension.id` (§51.13).
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.
@@ -574,7 +613,7 @@ The checklist that used to live under this heading now lives under Phase 16, whe
 actual bridge engine has now been built. Heading kept, body intentionally emptied, for
 session-history continuity — not a second, duplicate copy of the same checklist.)
 
-## Backlog (Roadmap Phase 22+, not scheduled yet)
+## Backlog (Roadmap Phase 23+, not scheduled yet)
 - [ ] Curved rail placement (extends `RailPermutationBuilder.js`, per its own design notes)
 - [x] ~~Underwater railways~~ — done, Roadmap Phase 18 (Project Prompt 18). See
       ARCHITECTURE.md §47.
@@ -584,7 +623,9 @@ session-history continuity — not a second, duplicate copy of the same checklis
 - [x] ~~A `@minecraft/server-ui` test mock so `ui/BuildMenu.js` can be covered by an
       automated test~~ — done, Roadmap Phase 21 (Project Prompt 21). See
       ARCHITECTURE.md §50.9.
-- [ ] Undo system
+- [ ] Undo system — now has its prerequisite: `BuildPlan.modificationBoundary` (Roadmap
+      Phase 22, Project Prompt 22) is a real, inspectable set of every position a build
+      touched. See ARCHITECTURE.md §51.4.
 - [ ] Railway blueprint save/load
 - [ ] Railway templates
 - [ ] Additional language support

@@ -112,3 +112,8 @@ ryzenRailBuilder.menu.materialTitle=Select Bridge Material
 ryzenRailBuilder.menu.materialBody=Choose a block from your inventory to build the bridge with. The addon will calculate exactly how many you need - you don't need to enter an amount.
 ryzenRailBuilder.menu.noMaterialsAvailable=§cYou aren't holding any blocks that can be used as bridge material. Pick up some blocks (cobblestone, stone, wood, etc.) and try again.
 ryzenRailBuilder.path.rejected.bridgeLengthTooShort=§cHeight %1$s needs a railway at least %2$s blocks long to climb up, cross, and come back down safely. Choose a shorter height or a longer railway.
+
+## --- Project Prompt 22: Smart Build Preview, Validation & Safety ---
+ryzenRailBuilder.status.cannotBuild=§cSTATUS: CANNOT BUILD
+ryzenRailBuilder.validation.dimensionChanged=§cYou changed dimensions before construction could begin. Please try again.
+ryzenRailBuilder.validation.railConflict=§cAnother build is already using part of this area. Please wait or choose a different location.

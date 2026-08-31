@@ -52,7 +52,11 @@ export const PipelineOutcome = Object.freeze({
    * unreachable because PathValidator was a stub.
    */
   TERRAIN_FAILED: "TERRAIN_FAILED",
-  /** VALIDATION_FAILED at InventoryStage — real and reachable as of Project Prompt 8. */
+  /**
+   * VALIDATION_FAILED at InventoryStage — real and reachable as of Project
+   * Prompt 8. Also covers BuildPlanStage's own resource-staleness rejections
+   * (Project Prompt 22) — see classifyOutcome() below.
+   */
   INVENTORY_FAILED: "INVENTORY_FAILED",
   /**
    * VALIDATION_FAILED at PlacementStage — new Project Prompt 10. A build
@@ -95,10 +99,37 @@ export function classifyOutcome(result) {
       return PipelineOutcome.PENDING_FUTURE_WORK;
     case PipelineResultStatus.VALIDATION_FAILED:
       if (result.stageName === "InventoryStage") return PipelineOutcome.INVENTORY_FAILED;
+      if (result.stageName === "BuildPlanStage") {
+        // Added Project Prompt 22: BuildPlanStage re-runs FOUR different
+        // checks immediately before construction (see that file), and each
+        // one's OUTCOME category should match what the SAME check would be
+        // classified as if it had failed the first time, earlier in the
+        // pipeline — INVENTORY_CHANGED_BEFORE_BUILD/
+        // MATERIAL_CHANGED_BEFORE_BUILD are genuinely inventory problems
+        // (the same reasons InventoryStage itself would report); the other
+        // three (player disconnected, dimension changed, item swapped) are
+        // the exact same checks ValidationStage's own PlayerValidator/
+        // OriginValidator/HeldItemValidator already run, and are classified
+        // the same way here for consistency, not lumped into
+        // INVENTORY_FAILED just because they happen to run in this stage.
+        if (result.reason === "INVENTORY_CHANGED_BEFORE_BUILD" || result.reason === "MATERIAL_CHANGED_BEFORE_BUILD") {
+          return PipelineOutcome.INVENTORY_FAILED;
+        }
+        return PipelineOutcome.VALIDATION_FAILED;
+      }
       if (result.stageName === "TerrainScanningStage" || result.stageName === "FinalSafetyCheckStage") {
         return PipelineOutcome.TERRAIN_FAILED;
       }
-      if (result.stageName === "PlacementStage") return PipelineOutcome.PLACEMENT_INCOMPLETE;
+      if (result.stageName === "PlacementStage") {
+        // Added Project Prompt 22: a RAIL_CONFLICT rejection (see
+        // core/ActiveBuildRegistry.js) happens BEFORE RailBuilder.run() is
+        // ever called — zero blocks placed, unlike every other
+        // PlacementStage failure (which stops mid-build, after some rails
+        // were already placed and kept). Classifying it as
+        // PLACEMENT_INCOMPLETE would misrepresent it as a partial build.
+        if (result.reason === "RAIL_CONFLICT") return PipelineOutcome.VALIDATION_FAILED;
+        return PipelineOutcome.PLACEMENT_INCOMPLETE;
+      }
       return PipelineOutcome.VALIDATION_FAILED;
     default:
       return PipelineOutcome.UNEXPECTED_ERROR;

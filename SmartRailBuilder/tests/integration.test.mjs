@@ -60,8 +60,10 @@ import { ModeAvailabilityStage } from "../BP/scripts/core/pipeline/stages/ModeAv
 import { TerrainScanningStage } from "../BP/scripts/core/pipeline/stages/TerrainScanningStage.js";
 import { InventoryStage } from "../BP/scripts/core/pipeline/stages/InventoryStage.js";
 import { FinalSafetyCheckStage } from "../BP/scripts/core/pipeline/stages/FinalSafetyCheckStage.js";
+import { BuildPlanStage } from "../BP/scripts/core/pipeline/stages/BuildPlanStage.js";
 import { PlacementStage } from "../BP/scripts/core/pipeline/stages/PlacementStage.js";
 import { CompletionStage } from "../BP/scripts/core/pipeline/stages/CompletionStage.js";
+import { ActiveBuildRegistry } from "../BP/scripts/core/ActiveBuildRegistry.js";
 import { PipelineContext } from "../BP/scripts/core/pipeline/PipelineContext.js";
 import { PipelineResultStatus } from "../BP/scripts/core/pipeline/PipelineResult.js";
 import { BuildOrchestrator } from "../BP/scripts/core/BuildOrchestrator.js";
@@ -114,6 +116,7 @@ function buildRealDependencyGraph(buildMenu) {
   const railBuilder = new RailBuilder();
   const bridgeValidation = new BridgeValidation();
   const undergroundValidation = new UndergroundValidation();
+  const activeBuildRegistry = new ActiveBuildRegistry();
 
   const validationManager = new ValidationManager([
     new PlayerValidator(),
@@ -134,12 +137,13 @@ function buildRealDependencyGraph(buildMenu) {
     new TerrainScanningStage(terrainScanner, pathValidator, messageService, bridgeValidation, undergroundValidation),
     new InventoryStage(inventoryManager, resourceValidator, messageService),
     new FinalSafetyCheckStage(terrainScanner, messageService),
-    new PlacementStage(railBuilder, cancellationWatcher, messageService, strategiesByMode),
+    new BuildPlanStage(inventoryManager, resourceValidator),
+    new PlacementStage(railBuilder, cancellationWatcher, messageService, strategiesByMode, activeBuildRegistry),
     new CompletionStage(messageService),
   ]);
 
   const orchestrator = new BuildOrchestrator({ pipeline, messageService });
-  return { orchestrator, pipeline, cancellationWatcher, inventoryManager };
+  return { orchestrator, pipeline, cancellationWatcher, inventoryManager, activeBuildRegistry };
 }
 
 function stubBuildMenu({ mode = "NORMAL", modeValue, length = 5, materialId, confirmed = true }) {

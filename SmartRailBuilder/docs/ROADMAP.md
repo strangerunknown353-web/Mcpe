@@ -1119,7 +1119,40 @@ configuration screen, material selection and its automatic calculation, out-of-r
 rejection, cancellation, the build summary's accuracy, Survival vs. Creative, and two
 simultaneous players.
 
-## Phase 22+ — Reserved for Future Features (planned only when reached)
+## Phase 22 — Smart Build Preview, Validation & Safety (Project Prompt 22) — COMPLETE (awaiting in-game confirmation)
+
+Status: a consolidation and hardening pass on top of the existing pipeline, not a redesign —
+the conceptual flow (UI → BuildConfiguration → BuildPlan → TerrainScanner → PathValidator →
+InventoryValidator → FinalValidation → Construction) was already exactly this project's
+`RailDetectionStage → ... → CompletionStage` chain; this session gave that chain a real,
+consolidated `BuildPlan` object and closed its one remaining async-staleness gap. New:
+`core/BuildPlan.js` (the complete build plan — rail type, mode, positions, terrain info,
+required rails/material, and a world modification boundary — assembled from data the pipeline
+had already computed, no new scans); a new `BuildPlanStage`, running immediately before
+`PlacementStage`, that re-checks player validity, dimension, held item, and inventory one
+final time (the one real gap in "immediately before construction, revalidate everything" —
+`FinalSafetyCheckStage` already re-scanned terrain/plans, but nothing re-checked those four);
+`core/ActiveBuildRegistry.js`, a new multiplayer safety net claiming a build's exact
+modification boundary so two players' builds can never silently overlap (rejected outright
+with zero blocks placed, never a silent corruption); and `config/ValidationErrorCategory.js`,
+mapping every existing internal rejection reason onto the prompt's 13 named categories without
+touching any existing player-facing message. One real bug found and fixed:
+`ResourceValidator` always reported "INSUFFICIENT_RAILS" even when checking bridge material.
+See ARCHITECTURE.md §51 for the complete write-up, including the one genuine, disclosed
+tension between this session's own requirements (§1/§8's exact "Required Blocks: 84" summary
+example vs. §12's performance rule) and how it was resolved — the same direction Project
+Prompt 21 already chose, for the same reason. **A new, testable `.mcaddon` was packaged and
+delivered this session** — version 0.1.15. 275 assertions across 6 test files, all passing;
+`node --check` clean across 79 script files.
+
+### Phase 22 Manual Testing Checklist
+See this session's final report (delivered alongside the `.mcaddon`) for the complete,
+numbered 20-item Minecraft PE testing checklist covering valid builds in all three modes,
+every boundary/invalid case (height/depth 0 and out-of-range, insufficient rails/material),
+an underwater tunnel, build cancellation, a long build, Survival vs. Creative, and a
+two-player test including an inventory change before final confirmation.
+
+## Phase 23+ — Reserved for Future Features (planned only when reached)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is
 currently dark and will spawn mobs; worth a deliberate decision) · cave-floor filling for
 Underground Mode (BridgeSupportBuilder is the natural reuse) · curved rails · undo
@@ -1130,7 +1163,9 @@ additional building modes beyond the three permanent ones (e.g. a future "Bluepr
 of these is a registry entry, not a rewrite) · sealing Underground's best-effort landing
 buffer against water too (currently just omitted when unsafe, see ARCHITECTURE.md
 §47.10) · a wider (not just lateral) waterproof shell for large aquifer pockets, if
-in-game testing shows the current thin seal is ever insufficient.
+in-game testing shows the current thin seal is ever insufficient · an actual undo/rollback
+mechanism built on top of this session's new world modification boundary (§51.4), now that
+every build's exact touched-position set is a real, inspectable value.
 
 Each of these gets the same treatment as Phases 2–15: design discussion first, one
 milestone at a time, your testing before moving on.

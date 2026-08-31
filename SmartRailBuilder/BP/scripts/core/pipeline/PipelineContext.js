@@ -67,6 +67,8 @@ export class PipelineContext {
     this.inventoryCheck = undefined;
     /** @type {import("../../inventory/InventoryManager.js").InventoryReport|undefined} Set by InventoryStage, BRIDGE mode only (Project Prompt 16) — the bridge material's own InventoryReport, checked in addition to `inventoryCheck` (rails). Undefined for NORMAL mode. */
     this.bridgeInventoryCheck = undefined;
+    /** @type {import("../BuildPlan.js").BuildPlan|undefined} Set by BuildPlanStage (Project Prompt 22) — the complete, consolidated build plan, assembled only after every earlier stage (including FinalSafetyCheckStage's fresh re-scan) has succeeded. See core/BuildPlan.js. */
+    this.buildPlan = undefined;
     /** @type {import("../BuildSession.js").BuildSession|undefined} Set by PlacementStage (Project Prompt 10). */
     this.buildSession = undefined;
     /** @type {import("../../builder/strategies/RailBuildStrategy.js").BuildResult|undefined} Set by PlacementStage (Project Prompt 10). */
