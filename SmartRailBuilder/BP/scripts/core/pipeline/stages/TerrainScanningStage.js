@@ -145,7 +145,7 @@ export class TerrainScanningStage {
     Logger.info(
       `Terrain scan for ${player.name}: ${scanResult.safeCount}/${scanResult.totalScanned} safe ` +
         `(${scanResult.ascendingCount} ascending, ${scanResult.descendingCount} descending, ` +
-        `${scanResult.tunnelCount} tunneled), ${scanResult.hazardCount} hazard(s), ` +
+        `${scanResult.tunnelCount} tunneled, ${scanResult.underwaterCount} underwater), ${scanResult.hazardCount} hazard(s), ` +
         `${scanResult.unsupportedCount} unsupported, ${scanResult.unloadedCount} unloaded.`
     );
 
@@ -276,7 +276,8 @@ export class TerrainScanningStage {
       `Underground plan for ${player.name}: ${plan.requiredRailCount} rail position(s) ` +
         `(${plan.terrainSummary.rampPositionCount} ramp + ${plan.terrainSummary.flatPositionCount} flat), ` +
         `${plan.totalExcavationCount} excavation position(s) of which ${plan.terrainSummary.alreadyClearCount} already clear, ` +
-        `${plan.terrainSummary.commonOresExcavated} ore(s) in path, railY=${plan.railY} (depth ${plan.depth}).`
+        `${plan.terrainSummary.commonOresExcavated} ore(s) in path, ${plan.terrainSummary.waterRowsSealed} row(s) waterproofed ` +
+        `(${plan.totalSealCount} seal block(s)), railY=${plan.railY} (depth ${plan.depth}).`
     );
 
     return PipelineResult.success();

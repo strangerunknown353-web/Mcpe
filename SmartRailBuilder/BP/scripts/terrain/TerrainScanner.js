@@ -13,6 +13,7 @@ import { GapAnalyzer } from "./GapAnalyzer.js";
 import { BridgeDetector } from "./BridgeDetector.js";
 import { derivePathCategory } from "./PathCategory.js";
 import { LENGTH_PRESETS, RAIL_ITEM_ID_SET } from "../config/RailConfig.js";
+import { hasLiquidAbove, isSourceBlock, findLateralSealPositions } from "./WaterDetector.js";
 
 /**
  * TerrainScanner.js
@@ -23,6 +24,26 @@ import { LENGTH_PRESETS, RAIL_ITEM_ID_SET } from "../config/RailConfig.js";
  *   TerrainScanResult — it makes no accept/reject decisions itself. See
  *   ARCHITECTURE.md §5.2 for why this replaced the originally-separate
  *   hazard/chunk/shape scanners, and §21 for the original flat-only design.
+ *
+ * PROJECT PROMPT 18: UNDERWATER RAILWAY & WATER-SAFE CONSTRUCTION
+ *   Water is no longer an automatic rejection everywhere. `_scanPosition()`
+ *   now distinguishes three water shapes for NORMAL mode: ground itself
+ *   being liquid (no floor at this Y — resolved through the exact same
+ *   descend/ascend/tunnel/gap-analysis machinery an ordinary air gap already
+ *   uses, so a deep lake correctly surfaces as GapAnalyzer's existing
+ *   WATER_CROSSING gap type rather than a new, duplicated code path); a
+ *   single shallow layer of water directly at the rail's own spot, over
+ *   solid ground (safely buildable — FLAT_SAFE with `isUnderwater: true`,
+ *   the rail simply displaces the water block, exactly like placing over
+ *   any other replaceable decoration); and water stacked on top of THAT
+ *   (too deep for Normal Mode to safely carry a player through — UNSUPPORTED,
+ *   `unsupportedReason: "WATER_TOO_DEEP"`, directing the player to Bridge or
+ *   Underground Mode via PathValidator). `planBridge()` and
+ *   `planUnderground()` are extended the same session — see each method's
+ *   own doc below for its water-specific design. See
+ *   terrain/WaterDetector.js for the shared detection primitives all three
+ *   modes' water handling is built from, and ARCHITECTURE.md's Project
+ *   Prompt 18 entry for the full write-up.
  *
  * ROADMAP PHASE 12 (Project Prompt 12): TUNNELS THROUGH RISES > 1 BLOCK
  *   When the rail's own spot is blocked by more than 1 block (a hill/wall
@@ -184,6 +205,13 @@ const BUILDABLE_CLASSIFICATIONS = Object.freeze([
  * @property {import("./BridgeDetector.js").BridgeFeasibility} [bridgeFeasibility] Added
  *   Roadmap Phase 13. Present only when `unsupportedReason` is "DEEP_DROP". Never
  *   consulted for any accept/reject decision — see BridgeDetector.js's header.
+ * @property {boolean} isUnderwater Added Project Prompt 18. True only for a FLAT_SAFE
+ *   (or, via the ±1 step machinery, ASCENDING/DESCENDING) position whose rail spot is a
+ *   single shallow layer of water over solid ground — purely informational (execution
+ *   places a rail there exactly like any other clear position; the block naturally
+ *   displaces the water). Always false for every other classification.
+ * @property {{isSourceBlock: boolean}} [waterInfo] Added Project Prompt 18. Present only
+ *   when `isUnderwater` is true — see terrain/WaterDetector.js's `isSourceBlock()`.
  */
 
 /**
@@ -198,6 +226,7 @@ const BUILDABLE_CLASSIFICATIONS = Object.freeze([
  * @property {number} descendingCount
  * @property {number} tunnelCount Added Roadmap Phase 12.
  * @property {number} unloadedCount
+ * @property {number} underwaterCount Added Project Prompt 18. Buildable positions (FLAT_SAFE/ASCENDING/DESCENDING) whose rail spot is a safe, shallow water layer — see `TerrainPositionFact.isUnderwater`.
  * @property {boolean} isFlat True only if ascendingCount, descendingCount, tunnelCount, and unsupportedCount are all 0.
  * @property {boolean} buildReady True only if every position is FLAT_SAFE, ASCENDING, DESCENDING, or TUNNEL.
  */
@@ -521,10 +550,21 @@ export class TerrainScanner {
         if (HAZARD_BLOCK_ID_SET.has(deckBlock.typeId)) {
           return { feasible: false, rejectionReason: BridgeRejectionReason.BLOCKED_BY_HAZARD, rejectionPosition: deckPosition };
         }
-        if (deckBlock.isLiquid) {
-          return { feasible: false, rejectionReason: BridgeRejectionReason.BLOCKED_BY_LIQUID, rejectionPosition: deckPosition };
-        }
-        const deckClear = deckBlock.isAir || REPLACEABLE_BLOCK_ID_SET.has(deckBlock.typeId);
+        // WATER DETECTION (Project Prompt 18): a liquid deck position no
+        // longer rejects the bridge outright — the deck simply passes over
+        // it, exactly like the pier-support search further below already
+        // tolerates water rising through a support column (see that
+        // search's own `isRealSolidGround` check, and BridgeSupportBuilder.js's
+        // doc for why placement there deliberately never checks `isLiquid`).
+        // BridgeRejectionReason.BLOCKED_BY_LIQUID is no longer produced by
+        // this method as of this session — kept in the enum
+        // (terrain/BridgePlan.js) as a documented, now-unreachable value
+        // rather than deleted, matching this project's existing precedent
+        // for a superseded-but-harmless constant (see config/RailConfig.js's
+        // FALLBACK_MATERIAL_ID rename history). Lava remains rejected above
+        // (a HAZARD_BLOCK_ID_SET member, checked first) — unaffected by
+        // this change; see ARCHITECTURE.md's Project Prompt 18 entry.
+        const deckClear = deckBlock.isAir || deckBlock.isLiquid || REPLACEABLE_BLOCK_ID_SET.has(deckBlock.typeId);
         if (!deckClear) {
           const blockedByUnbreakable = UNBREAKABLE_BLOCK_ID_SET.has(deckBlock.typeId);
           return {
@@ -550,10 +590,10 @@ export class TerrainScanner {
         if (HAZARD_BLOCK_ID_SET.has(headroomBlock.typeId)) {
           return { feasible: false, rejectionReason: BridgeRejectionReason.BLOCKED_BY_HAZARD, rejectionPosition: headroomPosition };
         }
-        if (headroomBlock.isLiquid) {
-          return { feasible: false, rejectionReason: BridgeRejectionReason.BLOCKED_BY_LIQUID, rejectionPosition: headroomPosition };
-        }
-        const headroomClear = headroomBlock.isAir || REPLACEABLE_BLOCK_ID_SET.has(headroomBlock.typeId);
+        // WATER DETECTION (Project Prompt 18): see the matching deck-level
+        // comment above — water in the headroom column is likewise treated
+        // as clear, not a rejection.
+        const headroomClear = headroomBlock.isAir || headroomBlock.isLiquid || REPLACEABLE_BLOCK_ID_SET.has(headroomBlock.typeId);
         if (!headroomClear) {
           const blockedByUnbreakable = UNBREAKABLE_BLOCK_ID_SET.has(headroomBlock.typeId);
           return {
@@ -703,6 +743,19 @@ export class TerrainScanner {
    * duplicating them — "use the existing Terrain Scanner... do not
    * duplicate existing block-scanning logic" per Project Prompt 17.
    *
+   * WATERPROOF TUNNEL (Project Prompt 18)
+   *   Water intersecting the corridor (rail spot or headroom) no longer
+   *   rejects the plan outright — it's excavated like any other clearable
+   *   block, and every lateral face it could leak back in from (plus, only
+   *   at the row's actual ceiling, one roof-cap check) gets a `sealPositions`
+   *   entry for `UndergroundExecutionStrategy` to line with a solid block
+   *   immediately after excavating that row. Water directly beneath the
+   *   rail (the FLOOR, checked separately, earlier in this method) is
+   *   unchanged — a floor made of open water is still rejected outright
+   *   (`BLOCKED_BY_WATER`), since sealing doesn't fabricate a floor over
+   *   nothing. See terrain/WaterDetector.js for the detection primitives
+   *   and ARCHITECTURE.md's Project Prompt 18 entry for the full design.
+   *
    * @param {import("../core/BuildVector.js").BuildVector} buildVector
    * @param {number} length Requested number of rail positions.
    * @param {import("@minecraft/server").Dimension} dimension
@@ -731,6 +784,9 @@ export class TerrainScanner {
     let totalExcavationCount = 0;
     let alreadyClearCount = 0;
     let commonOresExcavated = 0;
+    // WATERPROOF TUNNEL (Project Prompt 18) — see the corridor loop below.
+    let totalSealCount = 0;
+    let waterRowsSealed = 0;
 
     for (let i = 0; i < length; i++) {
       const { x, z } = buildVector.horizontalAt(i);
@@ -781,6 +837,7 @@ export class TerrainScanner {
 
       // --- Corridor: the rail block plus its headroom, bottom-up.
       const excavationPositions = [];
+      const waterPositionsThisRow = [];
       for (let h = 0; h < clearance; h++) {
         const checkPosition = { x, y: y + h, z };
         const read = readBlock(dimension, checkPosition);
@@ -809,14 +866,21 @@ export class TerrainScanner {
         if (typeId === "minecraft:lava" || typeId === "minecraft:flowing_lava") {
           return { feasible: false, rejectionReason: UndergroundRejectionReason.BLOCKED_BY_LAVA, rejectionPosition: checkPosition };
         }
-        // Water anywhere in the corridor would flood the finished railway —
-        // excavating it just spreads it. Rejected, not solved: full
-        // underwater/drainage handling is explicitly out of scope this
-        // session. See ARCHITECTURE.md §45.8 for the limitation this leaves.
+        // WATERPROOF TUNNEL (Project Prompt 18): water inside the corridor
+        // itself (as opposed to the FLOOR — see the separate, unchanged
+        // floor check above, which still rejects outright: a floor made of
+        // open water is "no floor," not something sealing fixes) no longer
+        // rejects the whole plan. It's excavated exactly like any other
+        // clearable block below, and its position is recorded here so the
+        // seal pass right after this loop can wall off exactly the LATERAL
+        // faces this water could keep leaking in from — never a full ring,
+        // never the direction of travel itself. This is deliberately NOT
+        // "remove one water block and let the tunnel flood" — see
+        // terrain/WaterDetector.js's `findLateralSealPositions()` and
+        // ARCHITECTURE.md's Project Prompt 18 entry for the full design.
         if (block.isLiquid) {
-          return { feasible: false, rejectionReason: UndergroundRejectionReason.BLOCKED_BY_WATER, rejectionPosition: checkPosition };
-        }
-        if (HAZARD_BLOCK_ID_SET.has(typeId)) {
+          waterPositionsThisRow.push(checkPosition);
+        } else if (HAZARD_BLOCK_ID_SET.has(typeId)) {
           return { feasible: false, rejectionReason: UndergroundRejectionReason.BLOCKED_BY_HAZARD, rejectionPosition: checkPosition };
         }
 
@@ -858,10 +922,38 @@ export class TerrainScanner {
         totalExcavationCount += 1;
       }
 
+      // WATERPROOF TUNNEL, continued: only rows that actually intersected
+      // water do any of this extra work — an ordinary dry row costs nothing
+      // beyond the ore/hazard checks it already had. See PERFORMANCE in
+      // ARCHITECTURE.md's Project Prompt 18 entry for why this matters.
+      let sealPositions = [];
+      if (waterPositionsThisRow.length > 0) {
+        const sealPositionsByKey = new Map();
+        for (const waterPosition of waterPositionsThisRow) {
+          for (const lateral of findLateralSealPositions(dimension, waterPosition, buildVector.direction)) {
+            sealPositionsByKey.set(`${lateral.x},${lateral.y},${lateral.z}`, lateral);
+          }
+        }
+        // Roof cap: only relevant when water was found at this row's actual
+        // ceiling (the topmost clearance level) — any lower water position's
+        // "above" is just the next corridor block up, still interior, never
+        // a leak point. Bounded to at most 1 extra read per row.
+        const ceilingY = y + clearance - 1;
+        const ceilingWaterPosition = waterPositionsThisRow.find((position) => position.y === ceilingY);
+        if (ceilingWaterPosition && hasLiquidAbove(dimension, ceilingWaterPosition, 1)) {
+          const roofPosition = { x: ceilingWaterPosition.x, y: ceilingWaterPosition.y + 1, z: ceilingWaterPosition.z };
+          sealPositionsByKey.set(`${roofPosition.x},${roofPosition.y},${roofPosition.z}`, roofPosition);
+        }
+        sealPositions = Array.from(sealPositionsByKey.values());
+        totalSealCount += sealPositions.length;
+        waterRowsSealed += 1;
+      }
+
       railSteps.push({
         position: railPosition,
         slopeDirection: isRamp ? slopeDir : null,
         excavationPositions,
+        sealPositions,
       });
     }
 
@@ -916,12 +1008,14 @@ export class TerrainScanner {
       landingExcavationPositions,
       requiredRailCount: railSteps.length,
       totalExcavationCount: totalExcavationCount + landingExcavationPositions.length,
+      totalSealCount,
       terrainSummary: {
         surfaceReferenceY: originY,
         rampPositionCount: depth,
         flatPositionCount: length - depth,
         alreadyClearCount,
         commonOresExcavated,
+        waterRowsSealed,
       },
     };
   }
@@ -961,10 +1055,27 @@ export class TerrainScanner {
       flatFact.classification === TerrainClassification.HAZARD ||
       flatFact.classification === TerrainClassification.LIQUID ||
       flatFact.classification === TerrainClassification.UNLOADED ||
-      flatFact.classification === TerrainClassification.OUT_OF_BOUNDS
+      flatFact.classification === TerrainClassification.OUT_OF_BOUNDS ||
+      flatFact.unsupportedReason === "WATER_TOO_DEEP"
     ) {
-      // Hazard/liquid/unloaded/out-of-bounds never attempt a slope fallback
-      // — there's nothing a different Y would fix about any of those.
+      // Hazard/unloaded/out-of-bounds never attempt a slope fallback —
+      // there's nothing a different Y would fix about any of those. LIQUID
+      // is kept in this list defensively (Project Prompt 18: `_scanPosition`
+      // no longer produces it — a liquid ground already falls through to
+      // UNSUPPORTED above, letting THIS method's own descend/ascend/tunnel
+      // logic run over it normally, which is the whole point) rather than
+      // removed, matching TerrainClassification.js's own "reserved, not
+      // deleted" note for the same enum value. WATER_TOO_DEEP (Project
+      // Prompt 18) is added as its own terminal case for the same reason:
+      // without it, this position's own UNSUPPORTED verdict would instead
+      // fall into the ascend/tunnel fallback below, which can only ever
+      // produce a confusing "tunnel too long"/generic message for what's
+      // actually a clean, specific "use Bridge or Underground Mode"
+      // situation — found and fixed via this session's own test harness
+      // (tests/water.test.mjs) before it could ship, exactly the kind of
+      // bug the "state can change mid-build" re-check discipline elsewhere
+      // in this project is built to catch early. See ARCHITECTURE.md's
+      // Project Prompt 18 entry.
       return flatFact;
     }
 
@@ -1126,6 +1237,7 @@ export class TerrainScanner {
     let descendingCount = 0;
     let tunnelCount = 0;
     let unloadedCount = 0;
+    let underwaterCount = 0;
 
     for (const fact of positions) {
       if (BUILDABLE_CLASSIFICATIONS.includes(fact.classification)) {
@@ -1133,6 +1245,7 @@ export class TerrainScanner {
         if (fact.classification === TerrainClassification.ASCENDING) ascendingCount += 1;
         if (fact.classification === TerrainClassification.DESCENDING) descendingCount += 1;
         if (fact.classification === TerrainClassification.TUNNEL) tunnelCount += 1;
+        if (fact.isUnderwater) underwaterCount += 1;
         continue;
       }
 
@@ -1157,6 +1270,7 @@ export class TerrainScanner {
       descendingCount,
       tunnelCount,
       unloadedCount,
+      underwaterCount,
       isFlat: ascendingCount === 0 && descendingCount === 0 && tunnelCount === 0 && unsupportedCount === 0,
       buildReady: safeCount === positions.length,
     };
@@ -1214,10 +1328,12 @@ export class TerrainScanner {
 
     /** @type {TerrainClassification} */
     let classification;
+    let unsupportedReason;
+    let isUnderwater = false;
+    let waterInfo;
+
     if (hazardBlockId) {
       classification = TerrainClassification.HAZARD;
-    } else if (groundBlock.isLiquid || aboveBlock.isLiquid) {
-      classification = TerrainClassification.LIQUID;
     } else if (!isGroundSolid) {
       // Roadmap Phase 11: no longer terminal here — this is the raw "not
       // flat at this exact Y" signal. _resolveSteppedPosition() is what
@@ -1225,7 +1341,41 @@ export class TerrainScanner {
       // (which never calls _resolveSteppedPosition) has no previous
       // position to descend relative to, so a bare GAP there is reported
       // as UNSUPPORTED directly — a build can't start over a drop.
+      //
+      // WATER DETECTION (Project Prompt 18): this branch also covers the
+      // ground block itself being a liquid (isGroundSolid is `!isAir &&
+      // !isLiquid`, so a liquid ground already fails this check) — a body
+      // of water with no floor at this exact Y is treated identically to an
+      // ordinary open gap, reusing the SAME descend/ascend/tunnel/gap-
+      // analysis machinery rather than a second, duplicated water-gap code
+      // path. GapAnalyzer already tags a deep-enough one WATER_CROSSING
+      // (see terrain/GapAnalyzer.js — unchanged this session), which
+      // PathValidator now turns into a specific "use Bridge or Underground"
+      // message — see PathValidator.js.
       classification = TerrainClassification.UNSUPPORTED;
+    } else if (aboveBlock.isLiquid) {
+      // WATER DETECTION (Project Prompt 18): the rail's own spot is a
+      // liquid block, but the ground directly beneath it IS solid (already
+      // confirmed — the branch above would have caught a liquid ground) —
+      // a shallow puddle/stream/ford sitting on a real streambed, not an
+      // open body with no floor. Safely buildable: placing the rail block
+      // displaces this single water block exactly like placing over any
+      // other replaceable decoration (see StraightRailStrategy.js — it has
+      // no separate "is this clear" gate at all, just an unconditional
+      // setPermutation() once the position is confirmed FLAT_SAFE). Rejected
+      // only if a SECOND layer of water sits directly above this one
+      // (hasLiquidAbove) — that would submerge the rail too deep for Normal
+      // Mode to safely carry a player through, and the player is told to
+      // use Bridge or Underground Mode instead (see PathValidator.js's
+      // WATER_TOO_DEEP handling).
+      if (hasLiquidAbove(dimension, railPosition, 1)) {
+        classification = TerrainClassification.UNSUPPORTED;
+        unsupportedReason = "WATER_TOO_DEEP";
+      } else {
+        classification = TerrainClassification.FLAT_SAFE;
+        isUnderwater = true;
+        waterInfo = { isSourceBlock: isSourceBlock(aboveBlock) };
+      }
     } else if (!isAboveReplaceable) {
       // Same reasoning, mirrored: raw "blocked at this exact Y" signal.
       classification = TerrainClassification.UNSUPPORTED;
@@ -1244,8 +1394,10 @@ export class TerrainScanner {
       classification,
       hazardBlockId,
       slopeDirection: null,
-      unsupportedReason: undefined,
+      unsupportedReason,
       futureMetadata: undefined,
+      isUnderwater,
+      waterInfo,
     };
   }
 
@@ -1275,6 +1427,8 @@ export class TerrainScanner {
       slopeDirection: null,
       unsupportedReason,
       futureMetadata: undefined,
+      isUnderwater: false,
+      waterInfo: undefined,
     };
   }
 
@@ -1298,6 +1452,8 @@ export class TerrainScanner {
       slopeDirection: null,
       unsupportedReason: undefined,
       futureMetadata: undefined,
+      isUnderwater: false,
+      waterInfo: undefined,
     };
   }
 }

@@ -40,10 +40,11 @@ export const ADDON = Object.freeze({
   // by several releases. Found while bumping the manifest for this session (also
   // discovered RP/manifest.json's own version was independently stuck at 0.1.0 —
   // fixed alongside this one). All three numbers — this constant, BP/manifest.json,
-  // and RP/manifest.json — are now 0.1.7 and should be bumped together going
-  // forward. See CHANGELOG.md's Project Prompt 15 entry and TODO.md for the
-  // full write-up of this finding.
-  VERSION: "0.1.10",
+  // and RP/manifest.json — should be bumped together going forward. See
+  // CHANGELOG.md's Project Prompt 15 entry and TODO.md for the full write-up of
+  // this finding. Bumped to 0.1.11 this session (Project Prompt 18 — Underwater
+  // Railway & Water-Safe Construction); all three numbers confirmed still in sync.
+  VERSION: "0.1.11",
 });
 
 /**

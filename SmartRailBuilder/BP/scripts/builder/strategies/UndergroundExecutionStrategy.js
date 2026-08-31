@@ -1,6 +1,7 @@
 import { GameMode } from "@minecraft/server";
 import { buildStraightRailPermutation, buildAscendingRailPermutation } from "../RailPermutationBuilder.js";
 import { RAIL_ITEM_ID_SET } from "../../config/RailConfig.js";
+import { UNDERGROUND_CONFIG } from "../../config/UndergroundConfig.js";
 import { readBlock } from "../../utils/BlockReader.js";
 import { Logger } from "../../utils/Logger.js";
 import { LocalizationKeys } from "../../localization/LocalizationKeys.js";
@@ -126,13 +127,31 @@ export class UndergroundExecutionStrategy {
         announcedRailPhase = true;
       }
 
-      const excavation = this._tunnelExcavator.excavateRow(dimension, step.excavationPositions);
+      // WATERPROOF TUNNEL (Project Prompt 18): allowLiquid: true — this
+      // row's excavationPositions may legitimately include water
+      // planUnderground() already planned around (see terrain/TerrainScanner.js);
+      // TunnelExcavator's default (used by every OTHER caller, e.g. Normal
+      // Mode's hill-tunnels) still aborts on unexpected water. Lava is
+      // still never excavated regardless — see TunnelExcavator.excavateRow()'s
+      // own doc.
+      const excavation = this._tunnelExcavator.excavateRow(dimension, step.excavationPositions, { allowLiquid: true });
       if (!excavation.success) {
         Logger.warn(
           `Underground build stopped for ${player.name} at step ${i} ` +
             `(${step.position.x}, ${step.position.y}, ${step.position.z}): excavation failed (${excavation.reason}).`
         );
         return this._result(session, `UNDERGROUND_EXCAVATION_${excavation.reason}`);
+      }
+
+      // WATERPROOF TUNNEL (Project Prompt 18): seal the lateral/roof faces
+      // this row's water leaked in from, immediately after excavating it —
+      // before the rail-spot clearance check below, so the interior is
+      // walled off before anything else happens this iteration. Best-effort
+      // (see TunnelExcavator.sealPositions()'s own doc) and a no-op for the
+      // overwhelming majority of rows, which never intersected water at all
+      // (`step.sealPositions` is empty for those — see terrain/UndergroundPlan.js).
+      if (step.sealPositions.length > 0) {
+        this._tunnelExcavator.sealPositions(dimension, step.sealPositions, UNDERGROUND_CONFIG.SEAL_BLOCK_ID);
       }
 
       // Clearance verification, per Project Prompt 17's step 7: confirm the

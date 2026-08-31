@@ -126,6 +126,7 @@ export function rampSlopeDirection(travelDirection, directionUtils) {
  * @property {number} flatPositionCount How many positions are flat run at `railY`.
  * @property {number} alreadyClearCount Excavation positions that were already air — counted so the "blocks excavated" figure isn't inflated by empty space (e.g. an intersected cave).
  * @property {number} commonOresExcavated Ores from OreRegistry's COMMON tier in the excavation volume, reported to the player rather than destroyed silently.
+ * @property {number} waterRowsSealed Added Project Prompt 18. How many rail steps had corridor water and received a lateral/roof seal — see `UndergroundRailStep.sealPositions` and terrain/WaterDetector.js.
  */
 
 /**
@@ -143,6 +144,17 @@ export function rampSlopeDirection(travelDirection, directionUtils) {
  * @property {ReadonlyArray<{x: number, y: number, z: number}>} excavationPositions
  *   The rail block plus its headroom (2 total flat, 3 on a ramp — see
  *   config/UndergroundConfig.js), bottom-up.
+ * @property {ReadonlyArray<{x: number, y: number, z: number}>} sealPositions
+ *   Added Project Prompt 18 (WATERPROOF TUNNEL). Empty for an ordinary dry
+ *   row. Non-empty only when this row's corridor intersected water: the
+ *   lateral (perpendicular-to-travel) neighbor(s) of each such water
+ *   position that weren't already solid, plus — only when water sat at the
+ *   row's actual ceiling — one roof-cap position directly above it. See
+ *   terrain/WaterDetector.js's `findLateralSealPositions()` and
+ *   terrain/TerrainScanner.js's `planUnderground()` for how this is
+ *   computed, and builder/strategies/UndergroundExecutionStrategy.js for
+ *   where it's placed (immediately after excavating this row, via
+ *   `TunnelExcavator.sealPositions()`).
  */
 
 /**
@@ -164,6 +176,7 @@ export function rampSlopeDirection(travelDirection, directionUtils) {
  *   position couldn't be safely excavated; never affects `feasible`.
  * @property {number} [requiredRailCount] == railSteps.length.
  * @property {number} [totalExcavationCount] Every excavation position across every step, including ones already clear.
+ * @property {number} [totalSealCount] Added Project Prompt 18. Every seal block placed across every step's `sealPositions` combined — 0 for a tunnel that never intersected water.
  * @property {UndergroundTerrainSummary} [terrainSummary]
  * @property {string} [rejectionReason] Present only if !feasible. One of UndergroundRejectionReason below.
  * @property {{x: number, y: number, z: number}} [rejectionPosition] Present only if !feasible and the cause was position-specific.

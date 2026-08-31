@@ -125,6 +125,9 @@ export const LocalizationKeys = Object.freeze({
   PATH_REJECTED_UNBREAKABLE: "ryzenRailBuilder.path.rejected.unbreakable",
   PATH_REJECTED_TUNNEL_TOO_LONG: "ryzenRailBuilder.path.rejected.tunnelTooLong",
 
+  // --- Project Prompt 18: Underwater Railway & Water-Safe Construction ---
+  PATH_REJECTED_WATER_CROSSING: "ryzenRailBuilder.path.rejected.waterCrossingUnsafe",
+
   // --- Roadmap Phase 6: Inventory Verification ---
   INVENTORY_INSUFFICIENT: "ryzenRailBuilder.inventory.insufficient",
 

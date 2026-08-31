@@ -29,11 +29,12 @@ ryzenRailBuilder.validation.invalidOrigin=§cCouldn't determine a valid starting
 ## --- Roadmap Phase 6 (Project Prompt 8) ---
 ryzenRailBuilder.inventory.insufficient=§cYou don't have enough rails. You need %1$s more.
 ryzenRailBuilder.path.rejected.tooSteep=§cTerrain too steep. Tunnel or bridge support will be added in a future update.
-ryzenRailBuilder.path.rejected.hazard=§cThe path is blocked by a hazardous or liquid block.
+ryzenRailBuilder.path.rejected.hazard=§cThe path is blocked by a hazardous block (lava, fire, or similar).
 ryzenRailBuilder.path.rejected.unloaded=§cPart of the path isn't loaded. Move closer and try again.
 ryzenRailBuilder.path.rejected.outOfBounds=§cThe path would go outside the world's height limits.
 ryzenRailBuilder.path.rejected.unbreakable=§cCannot tunnel here — solid, unbreakable terrain blocks the way.
 ryzenRailBuilder.path.rejected.tunnelTooLong=§cThe tunnel needed here would be too long.
+ryzenRailBuilder.path.rejected.waterCrossingUnsafe=§cThis crossing has too much open water for Normal Mode. Use Bridge Mode to cross over it, or Underground Mode to tunnel beneath it.
 
 ## --- Project Prompt 9: Pipeline Integration & Player Feedback ---
 ryzenRailBuilder.actionbar.preparing=Preparing railway...
@@ -97,7 +98,7 @@ ryzenRailBuilder.path.rejected.undergroundLengthTooShort=§cDepth %1$s needs a r
 ryzenRailBuilder.path.rejected.undergroundUnbreakable=§cThe tunnel would have to break an unbreakable block (%1$s). Try a different depth or location.
 ryzenRailBuilder.path.rejected.undergroundHazard=§cThe tunnel path runs into a hazard. Try a different depth or location.
 ryzenRailBuilder.path.rejected.undergroundLava=§cThe tunnel path runs into lava. Try a different depth or location.
-ryzenRailBuilder.path.rejected.undergroundWater=§cThe tunnel path runs into water, which would flood the railway. Underwater railways aren't supported yet - try a different depth or location.
+ryzenRailBuilder.path.rejected.undergroundWater=§cThe tunnel floor here is open water with no solid ground beneath it. Try a different depth or location.
 ryzenRailBuilder.path.rejected.undergroundProtectedOre=§cThe tunnel would destroy a protected ore (%1$s). Try a different depth or location.
 ryzenRailBuilder.path.rejected.undergroundUnsupportedFloor=§cThe tunnel would open into a cave with no solid floor for the rails. Try a different depth or location.
 

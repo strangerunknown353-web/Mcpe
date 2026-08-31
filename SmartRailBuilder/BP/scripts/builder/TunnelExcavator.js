@@ -69,9 +69,22 @@ export class TunnelExcavator {
   /**
    * @param {import("@minecraft/server").Dimension} dimension
    * @param {ReadonlyArray<{x: number, y: number, z: number}>} excavationPositions
+   * @param {Object} [options]
+   * @param {boolean} [options.allowLiquid] Added Project Prompt 18. Default
+   *   false, preserving this method's original behavior for every existing
+   *   caller (StraightRailStrategy's Normal Mode hill-tunnels — water was
+   *   never part of that feature's scope and still aborts as a HAZARD,
+   *   completely unchanged). Pass `true` only for a position
+   *   `planUnderground()` already planned around and expects to be water —
+   *   see builder/strategies/UndergroundExecutionStrategy.js. Lava is
+   *   NEVER excavated regardless of this flag: the HAZARD_BLOCK_ID_SET
+   *   check below (which lava is always a member of) runs first and
+   *   unconditionally, independent of `allowLiquid` — see
+   *   ARCHITECTURE.md's Project Prompt 18 entry ("Lava must remain
+   *   protected by the existing safety rules").
    * @returns {ExcavationResult}
    */
-  excavateRow(dimension, excavationPositions) {
+  excavateRow(dimension, excavationPositions, { allowLiquid = false } = {}) {
     for (const position of excavationPositions) {
       const read = readBlock(dimension, position);
       if (read.status !== "OK") {
@@ -84,7 +97,13 @@ export class TunnelExcavator {
       if (UNBREAKABLE_BLOCK_ID_SET.has(block.typeId)) {
         return { success: false, reason: "UNBREAKABLE" };
       }
-      if (HAZARD_BLOCK_ID_SET.has(block.typeId) || block.isLiquid) {
+      // HAZARD_BLOCK_ID_SET always wins first, regardless of `allowLiquid`
+      // — lava is a member of that set and `isLiquid` too, so checking
+      // order here is what keeps lava rejected even when water is allowed.
+      if (HAZARD_BLOCK_ID_SET.has(block.typeId)) {
+        return { success: false, reason: "HAZARD" };
+      }
+      if (block.isLiquid && !allowLiquid) {
         return { success: false, reason: "HAZARD" };
       }
 
@@ -98,5 +117,44 @@ export class TunnelExcavator {
     }
 
     return { success: true };
+  }
+
+  /**
+   * Added Project Prompt 18 (WATERPROOF TUNNEL): places a solid seal block
+   * at each of the given positions — the lateral/roof faces where
+   * Underground Mode's corridor bordered a body of water it just excavated
+   * through (see terrain/TerrainScanner.js's `planUnderground()` and
+   * terrain/WaterDetector.js's `findLateralSealPositions()` for how these
+   * positions are determined). Re-verifies each position is still safe to
+   * write into (not unbreakable/hazardous) immediately before placing,
+   * mirroring `excavateRow()`'s own "state can change mid-build" re-check,
+   * just for placing a block instead of breaking one.
+   *
+   * Deliberately best-effort, like `planUnderground()`'s own terminal
+   * landing buffer: a seal position that's become unplaceable by the time
+   * this runs is simply skipped rather than failing the whole build over a
+   * bonus safety margin — see ARCHITECTURE.md's Project Prompt 18 KNOWN
+   * LIMITATIONS.
+   *
+   * @param {import("@minecraft/server").Dimension} dimension
+   * @param {ReadonlyArray<{x: number, y: number, z: number}>} positions
+   * @param {string} materialId
+   * @returns {number} How many seal blocks were actually placed.
+   */
+  sealPositions(dimension, positions, materialId) {
+    const permutation = BlockPermutation.resolve(materialId);
+    let placed = 0;
+
+    for (const position of positions) {
+      const read = readBlock(dimension, position);
+      if (read.status !== "OK") continue;
+      const block = read.block;
+      if (UNBREAKABLE_BLOCK_ID_SET.has(block.typeId) || HAZARD_BLOCK_ID_SET.has(block.typeId)) continue;
+
+      block.setPermutation(permutation);
+      placed += 1;
+    }
+
+    return placed;
   }
 }

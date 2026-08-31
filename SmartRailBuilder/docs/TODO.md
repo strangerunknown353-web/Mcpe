@@ -434,6 +434,31 @@ genuine regression evidence, just not a re-run of the original files byte-for-by
 - [ ] **Awaiting your in-game test pass** — full checklist in ROADMAP.md's new Bug-Fix
       Pass entry, which replaces Phase 16's now-stale checklist.
 
+## Completed — Roadmap Phase 18: Underwater Railway & Water-Safe Construction ✅
+- [x] **Normal Mode builds through shallow water** — a single layer over solid ground is
+      safely buildable (`isUnderwater: true`); anything deeper, or a drop into open
+      water with no floor (reuses `GapAnalyzer`'s existing `WATER_CROSSING` gap type),
+      rejects with a new, specific message naming Bridge/Underground Mode. §47.3, §47.5.
+- [x] **Bridge Mode passes over water** — deck/headroom liquid no longer rejects the
+      plan; piers already correctly rose through water to real ground (Phase 16). Fixed
+      a real gap along the way: `BridgeExecutionStrategy`'s own execution-time re-check
+      would have halted a now-valid plan mid-build. §47.4.
+- [x] **Underground Mode waterproofs a tunnel** instead of rejecting or flooding it —
+      corridor water is excavated and its lateral/roof faces sealed with a thin, free
+      solid lining; a liquid FLOOR is still correctly rejected outright. Fixed a real
+      gap along the way: `TunnelExcavator.excavateRow()` unconditionally rejected any
+      liquid regardless of what the plan now expected. §47.6.
+- [x] **Lava remains fully protected in every mode**, unconditionally, regardless of the
+      water changes — no automatic lava tunnels.
+- [x] **First committed, executable test harness** (`tests/`) — no `@minecraft/server`
+      dependency, 55 assertions, all passing. Closes a gap this document (via
+      ARCHITECTURE.md §33.2/§34.5) has flagged across multiple prior sessions. Two real
+      bugs were found and fixed by this process before shipping — see §47.11.
+- [x] `node --check` clean across every script file. Manifests + `Constants.js` version
+      bumped 0.1.10 → 0.1.11.
+- [ ] **Awaiting your in-game test pass** — full checklist in ROADMAP.md's new Phase 18
+      entry.
+
 ## ⚠️ Order Note (Pre-Prompt-18 Bug-Fix Pass)
 Uploaded with four specific bug reports and four screenshots, explicitly instructing
 "DO NOT START PROJECT PROMPT 18 YET." Honored — Project Prompt 18 was not started.
@@ -447,13 +472,16 @@ broken, the packaging fix (bugfix session) and the `.mcaddon` import itself rema
 right place to start ruling things out first, since nothing else can be verified until
 that works.
 
-## Up Next — Roadmap Phase 18+ (not started)
-(Per Project Prompt 17's own scope limit: no new building modes, no blueprint/undo, no
-decorative stations, no UI redesign this session; this bug-fix pass didn't touch it
-either. See ROADMAP.md's Phase 18+ backlog, still including underground tunnel lighting
-— ARCHITECTURE.md §45.12 flagged the finished tunnel as dark and mob-spawn-capable.
-Project Prompt 18 itself, whenever it arrives, is milestone-gated on your test pass of
-this bug-fix session, per the project's standing workflow.)
+## Up Next — Roadmap Phase 19+ (not started)
+(Per Project Prompt 18's own scope limit: no new building modes, no depth/height
+increases, no decorative bridge styles, no undo, no UI redesign this session. See
+ROADMAP.md's Phase 19+ backlog, still including underground tunnel lighting —
+ARCHITECTURE.md §45.12 flagged the finished tunnel as dark and mob-spawn-capable — plus
+two water-specific follow-ups noted in ARCHITECTURE.md §47.10: sealing Underground's
+best-effort landing buffer against water too, and a wider waterproof shell for large
+aquifer pockets if in-game testing shows the current thin lateral seal is ever
+insufficient. Project Prompt 19 itself, whenever it arrives, is milestone-gated on your
+test pass of this session, per the project's standing workflow.)
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.
@@ -461,9 +489,13 @@ The checklist that used to live under this heading now lives under Phase 16, whe
 actual bridge engine has now been built. Heading kept, body intentionally emptied, for
 session-history continuity — not a second, duplicate copy of the same checklist.)
 
-## Backlog (Roadmap Phase 18+, not scheduled yet)
+## Backlog (Roadmap Phase 19+, not scheduled yet)
 - [ ] Curved rail placement (extends `RailPermutationBuilder.js`, per its own design notes)
-- [ ] Underwater railways (consumes `LIQUID` positions, already identified by the scanner)
+- [x] ~~Underwater railways~~ — done, Roadmap Phase 18 (Project Prompt 18). See
+      ARCHITECTURE.md §47.
+- [ ] Sealing Underground Mode's best-effort landing buffer against water (currently
+      just omitted when unsafe — ARCHITECTURE.md §47.10)
+- [ ] A wider (non-lateral-only) waterproof shell for large aquifer pockets, if needed
 - [ ] Undo system
 - [ ] Railway blueprint save/load
 - [ ] Railway templates

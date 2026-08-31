@@ -86,6 +86,13 @@ export class UndergroundValidation {
       if (!Array.isArray(step.excavationPositions) || step.excavationPositions.length === 0) {
         return { valid: false, reason: "MISSING_EXCAVATION_POSITIONS" };
       }
+      // Added Project Prompt 18 (WATERPROOF TUNNEL): every step must carry
+      // a sealPositions array, even if empty for an ordinary dry row — a
+      // missing array (as opposed to an empty one) would indicate
+      // planUnderground()'s own arithmetic dropped the field somewhere.
+      if (!Array.isArray(step.sealPositions)) {
+        return { valid: false, reason: "MISSING_SEAL_POSITIONS" };
+      }
     }
 
     return { valid: true };

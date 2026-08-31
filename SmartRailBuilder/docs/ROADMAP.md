@@ -938,15 +938,80 @@ REGRESSION:
       confirm complete isolation
 - [ ] Two players with independent underground depths — confirm complete isolation
 
-## Phase 18+ — Reserved for Future Features (planned only when reached)
+## Phase 18 — Underwater Railway & Water-Safe Construction (Project Prompt 18) — COMPLETE (awaiting in-game confirmation)
+
+Status: water is no longer an automatic rejection anywhere. Normal Mode safely builds
+through a single shallow layer of water over solid ground (a puddle/ford/shallow
+stream), and clearly rejects — pointing to Bridge or Underground Mode — anything deeper,
+whether that's water stacked at rail level or a drop into open water (the latter reuses
+`GapAnalyzer`'s existing `WATER_CROSSING` gap type, wired to a player message for the
+first time this session). Bridge Mode now passes over water instead of rejecting a deck
+or headroom position that happens to be wet — piers already correctly rose through a
+water column to real ground (Project Prompt 16's design), the only real gap was two
+premature rejections upstream of that. Underground Mode excavates through a water pocket
+and seals the lateral/roof faces it bordered (a thin, corridor-shaped seal, never a
+massive structure) instead of rejecting the whole plan or letting the tunnel flood; a
+liquid FLOOR is still correctly rejected outright (sealing doesn't fabricate a floor over
+nothing), and lava remains fully protected in every mode, unconditionally, regardless of
+the water changes. See ARCHITECTURE.md §47 for the complete design, including two real
+bugs found and fixed via this session's own new test harness before shipping, and
+`tests/README.md` for how to run it (55 assertions, all passing, `node --check` clean).
+
+### Phase 18 Manual Testing Checklist
+NORMAL MODE + WATER:
+- [ ] Small water crossing (a single shallow puddle/stream, solid floor) — confirm the
+      rail is placed straight through it, no rejection
+- [ ] Shallow water (exactly one block deep) vs. deep water (two+ blocks stacked at rail
+      level) — confirm the shallow case builds and the deep case rejects with a message
+      naming Bridge/Underground Mode specifically
+- [ ] Step off a bank into a large/deep body of water with no floor nearby — confirm the
+      same clear "use Bridge or Underground" message, not a generic "too steep" one
+- [ ] Confirm NO large body of water is ever auto-drained/filled by a rejected attempt
+
+BRIDGE MODE + WATER:
+- [ ] Build a bridge whose deck passes directly over/through a lake or river — confirm
+      no rejection, and confirm the water is NOT drained/filled unnecessarily
+- [ ] Build a low bridge whose deck sits exactly at the water's surface — confirm it
+      still builds correctly
+- [ ] Confirm piers still visibly rise up through the water to real ground below
+
+UNDERGROUND MODE + WATER:
+- [ ] Tunnel beneath a lake/pond — confirm the tunnel interior stays completely dry
+      (no water dripping/flowing in) end to end
+- [ ] Tunnel that enters and exits a body of water along its length — confirm both
+      transitions are clean, no flooding, no one-block obstruction
+- [ ] Confirm a liquid FLOOR (open water directly beneath the planned rail, no ground)
+      is still correctly rejected, not silently built over
+- [ ] Confirm lava anywhere along the route still aborts the build safely — no automatic
+      lava tunnels under any circumstances
+
+RAIL TYPES + TRANSITIONS:
+- [ ] All 4 rail types (Rail, Powered, Detector, Activator) through a shallow water
+      crossing and through an Underground water-sealed section
+- [ ] Normal → water → Bridge, Normal → water → Underground, Bridge → water → Bridge,
+      Underground → water → Underground, Normal → Bridge → Normal, Normal → Underground
+      → Normal — confirm no missing/floating rails, no water in the player's path
+
+REGRESSION (must still work exactly as before):
+- [ ] Plain NORMAL straight railway and one-block slopes on dry land
+- [ ] Bridge gradual climb/crest/descent and lightweight pier structure (Phase 16/
+      bugfix-pass behavior)
+- [ ] Underground landing buffer at the tunnel's end, max depth 20
+- [ ] Existing-rail crossings still preserved in all three modes
+- [ ] Two players building through water simultaneously — confirm complete isolation
+
+## Phase 19+ — Reserved for Future Features (planned only when reached)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is
 currently dark and will spawn mobs; worth a deliberate decision) · cave-floor filling for
-Underground Mode (BridgeSupportBuilder is the natural reuse) · curved rails · underwater
-rails · undo system · blueprint save/load · rail templates ·
-additional localization · accessibility improvements · dedicated-server-specific
-optimization (deferred per decision #7) · additional building modes beyond the three
-permanent ones (e.g. a future "Blueprint" or "Curve" mode — `config/BuildModes.js` was
-built in Phase 15 specifically so adding one of these is a registry entry, not a rewrite).
+Underground Mode (BridgeSupportBuilder is the natural reuse) · curved rails · undo
+system · blueprint save/load · rail templates · additional localization · accessibility
+improvements · dedicated-server-specific optimization (deferred per decision #7) ·
+additional building modes beyond the three permanent ones (e.g. a future "Blueprint" or
+"Curve" mode — `config/BuildModes.js` was built in Phase 15 specifically so adding one
+of these is a registry entry, not a rewrite) · sealing Underground's best-effort landing
+buffer against water too (currently just omitted when unsafe, see ARCHITECTURE.md
+§47.10) · a wider (not just lateral) waterproof shell for large aquifer pockets, if
+in-game testing shows the current thin seal is ever insufficient.
 
 Each of these gets the same treatment as Phases 2–15: design discussion first, one
 milestone at a time, your testing before moving on.

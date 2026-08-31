@@ -33,7 +33,7 @@ export const TerrainClassification = Object.freeze({
   FLAT_SAFE: "FLAT_SAFE",
   /** Ground or rail position matches a HazardRegistry block id (lava, fire, cactus, ...). */
   HAZARD: "HAZARD",
-  /** Ground or rail position is a liquid (chiefly water) — underwater isn't supported yet, see ARCHITECTURE.md §21.3. */
+  /** Reserved/defensive as of Project Prompt 18: `_scanPosition()` no longer produces this classification directly. A liquid ground position now resolves through the same not-solid-ground path as an ordinary gap (UNSUPPORTED), and a liquid rail-spot over solid ground resolves to FLAT_SAFE with `isUnderwater: true` (safe, shallow) or UNSUPPORTED/"WATER_TOO_DEEP" (unsafe, too deep) — see terrain/WaterDetector.js and terrain/TerrainScanner.js's Project Prompt 18 section. Kept for defensive symmetry with PathValidator's/PathCategory's existing unrecognized-classification fallbacks, not because anything still emits it. */
   LIQUID: "LIQUID",
   /** Terrain dropped by exactly 1 block relative to the previous position — buildable, descending rail. Added Roadmap Phase 11. */
   DESCENDING: "DESCENDING",

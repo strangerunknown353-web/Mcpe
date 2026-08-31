@@ -3772,3 +3772,258 @@ across three separate layers:
 **Still not confirmed in-game** — this session fixed exactly the four things you
 reported, verified as thoroughly as a Node-only harness can, but none of it substitutes
 for your own test pass. See TODO.md's checklist.
+
+## 47. Underwater Railway & Water-Safe Construction (Roadmap Phase 18, Project Prompt 18)
+
+### 47.1 — Why Water Was Rejected Everywhere Before This Session
+
+Every mode treated any liquid block as an automatic dead end: `TerrainScanner._scanPosition()`
+classified ground-or-rail-spot liquid as `LIQUID` (always rejected, §21.3); `planBridge()`
+rejected a liquid deck or headroom position outright (`BLOCKED_BY_LIQUID`); `planUnderground()`
+rejected any liquid anywhere in the corridor (`BLOCKED_BY_WATER`). This was a deliberate,
+disclosed scope line in every prior session, not an oversight — "do not implement the
+complete underwater railway system yet" (§37/§45.8) — and this session is exactly the one
+that draws it properly instead of continuing to defer it.
+
+### 47.2 — Water Detection: `terrain/WaterDetector.js`
+
+A new leaf module, mirroring `GapAnalyzer.js`'s/`BridgeDetector.js`'s established
+"detection only, reuse `readBlock`, attach structured data, never decide buildability
+itself" pattern — reused, not duplicated. Four small, independently-readable primitives:
+
+- `hasLiquidAbove(dimension, position, height)` — is there more liquid stacked above a
+  given position. Fails safe (an unreadable position above counts as "yes, more water")
+  — see the function's own doc for why guessing permissive would be the wrong direction.
+- `isSourceBlock(block)` — best-effort source-vs-flowing check for logging only, never
+  gates a decision (the same "don't trust an unconfirmed API for a real decision" caution
+  as §34's `Block.isSolid` lesson — `liquid_depth` isn't confirmed stable the way
+  `isLiquid`/`isAir` are).
+- `perpendicularOffsets(direction)` — the two unit offsets perpendicular to travel,
+  computed from `DirectionUtils.toStepVector()`'s existing table rather than a second
+  direction table.
+- `findLateralSealPositions(dimension, waterPosition, direction)` — Underground Mode's
+  waterproofing primitive: of a water position's two LATERAL neighbors (never along the
+  direction of travel), which ones aren't already solid and therefore need a seal block.
+  An already-solid neighbor is left alone — no wasted write.
+
+None of this duplicates `_scanPosition()`'s own hazard/solidity checks; it composes on
+top of `readBlock()`, exactly like every other terrain detector in this project.
+
+### 47.3 — Normal Mode: Three Water Shapes, Not One
+
+`_scanPosition()` no longer produces `LIQUID` at all (kept in the enum, defensively, per
+`TerrainClassification.js`'s own updated doc — see §47.7 below for the "reserved, not
+deleted" precedent this follows). Three distinct cases now:
+
+1. **Ground itself is a liquid** (no floor at this Y — a lake, a pond with no bottom
+   found at this exact column). Falls through to the SAME `!isGroundSolid` → `UNSUPPORTED`
+   path an ordinary open-air gap already used — no new, parallel water-gap code path.
+   `_resolveSteppedPosition()`'s existing descend/ascend/tunnel machinery runs over it
+   unchanged, and `GapAnalyzer`'s existing `WATER_CROSSING` gap type (already implemented
+   since Project Prompt 13, never wired to a player-facing message before now — see
+   §47.5) is what a genuinely-too-deep instance of this surfaces as.
+2. **Rail spot is a single shallow layer of water, ground below is solid** (a puddle, a
+   ford, a shallow stream bed). Safely buildable: `FLAT_SAFE` with `isUnderwater: true`
+   and a `waterInfo.isSourceBlock` flag. Placing the rail simply displaces the water
+   block — no execution-side change needed at all, since `StraightRailStrategy` already
+   has no separate "is this clear" gate, just an unconditional `setPermutation()` once a
+   position is confirmed `FLAT_SAFE`. This is also why `isUnderwater` rides through
+   `_resolveSteppedPosition()`'s existing descend/ascend spread (`{...descendFact,
+   classification: DESCENDING}`) for free — a shallow puddle one step down or up along a
+   slope is handled with zero additional code.
+3. **Water stacked on top of that** (deep enough to submerge a rail past a single shallow
+   layer). `UNSUPPORTED`, `unsupportedReason: "WATER_TOO_DEEP"` — checked via
+   `hasLiquidAbove(dimension, railPosition, 1)`.
+
+**A real bug found and fixed by this session's own test harness before it could ship:**
+case 3's `UNSUPPORTED` verdict was not originally added to `_resolveSteppedPosition()`'s
+terminal early-return list (the one that already special-cased `FLAT_SAFE`/`HAZARD`/
+`LIQUID`/`UNLOADED`/`OUT_OF_BOUNDS` as "nothing a different Y would fix"). Without that,
+a water-too-deep verdict at the requested Y fell through into the ascend/tunnel fallback
+machinery, which then asked `TunnelDetector` to bore through what is actually just deep
+water — `TunnelDetector` correctly flagged the water as a hazard and failed for ITS OWN
+reason, surfacing a generic `HAZARD` rejection instead of the intended, specific "use
+Bridge or Underground Mode" message. `tests/water.test.mjs`'s very first run of the
+"deep water at rail level" scenario caught this immediately (expected `WATER_TOO_DEEP`,
+got `HAZARD`) — fixed by adding `flatFact.unsupportedReason === "WATER_TOO_DEEP"` to the
+terminal list, confirmed clean on re-run. See `tests/README.md`.
+
+### 47.4 — Bridge Mode: Passing Over Water, Not Around It
+
+`planBridge()`'s deck and headroom checks now fold `isLiquid` into "clear," the same as
+air or a replaceable decoration, instead of rejecting outright. This required no new
+geometry: the pier-support search further down the SAME method already tolerated water
+rising through a support column (`isRealSolidGround` already treated a liquid ground
+check as "keep searching down," and `BridgeSupportBuilder.js` already deliberately never
+checked `isLiquid` when placing a support/surface block — both written in Project Prompt
+16, apparently anticipating exactly this). The only real gap was the two premature
+deck/headroom rejections happening BEFORE that already-water-tolerant logic ever ran.
+Lava is unaffected — `HAZARD_BLOCK_ID_SET` is checked first, unconditionally, at both
+the deck and headroom read, and lava is a member of that set regardless of the liquid
+change.
+
+**A second real gap found and fixed, not by the test harness (which only exercises
+planning) but by tracing every consumer of the changed behavior by hand, the same
+discipline that caught §36.4's stale `PlacementStage` recomputation and §46.10's stale
+logging line:** `BridgeExecutionStrategy.js`'s own per-block re-check
+(`stillClear = block.isAir || REPLACEABLE_BLOCK_ID_SET.has(...)`) did NOT allow liquid —
+so a plan that now correctly accepted a water deck would have halted at EXECUTION time
+with `BRIDGE_DECK_OBSTRUCTED_DURING_BUILD` the moment that position's turn came up.
+Fixed by folding `block.isLiquid` into that check too, matching the planning-time change
+exactly. `BridgeRejectionReason.BLOCKED_BY_LIQUID` is no longer produced by this method
+— kept in the enum (`terrain/BridgePlan.js`) as a documented, unreachable value, the same
+"reserved, not deleted" treatment `TerrainClassification.LIQUID` gets (see §47.7) and the
+same precedent `RailConfig.js`'s `FALLBACK_MATERIAL_ID` rename already established for a
+superseded constant.
+
+### 47.5 — Normal Mode Rejection Message: One Reason, Two Detection Paths
+
+New `PathRejectionReason.WATER_CROSSING_UNSAFE` (and its message,
+`PATH_REJECTED_WATER_CROSSING`, telling the player to use Bridge or Underground Mode)
+is reached from two genuinely different detection paths, unified in `PathValidator`:
+
+- `unsupportedReason === "WATER_TOO_DEEP"` (§47.3's case 3), via the existing
+  `UNSUPPORTED_REASON_TO_REASON` lookup table — no special-case code needed, just one
+  new table entry, the same mechanism Project Prompt 12 already established for tunnel
+  failure reasons.
+- `fact.pathCategory === PathCategory.WATER_CROSSING` (a drop of more than 1 block into a
+  body of water — GapAnalyzer's existing `WATER_CROSSING` gap type, unchanged since
+  Project Prompt 13, wired to a player message for the first time this session). This
+  needed its own explicit check in `validate()`, checked BEFORE the generic
+  `unsupportedReason` lookup, because this gap shape is tagged `"DEEP_DROP"` the same as
+  an ordinary cliff — `unsupportedReason` alone can't tell "fell off a cliff" from "fell
+  into a lake," only `pathCategory` can.
+
+Both a rail-level puddle that's too deep AND a drop into open water now give the player
+the exact same, specific, actionable message — and neither required a single new block
+read beyond what each detection path already needed for its own reason.
+
+### 47.6 — Underground Mode: Waterproof Tunnel, Not a Flood or a Rejection
+
+`planUnderground()`'s corridor loop (rail spot + headroom, per row) no longer rejects on
+`block.isLiquid` — it excavates the water like any other clearable block AND records the
+position in that row's `waterPositionsThisRow`. After the row's corridor loop, IF that
+row touched water at all (the overwhelmingly common case — a dry row — costs nothing
+extra):
+
+- `findLateralSealPositions()` runs on every water position in the row, collecting the
+  lateral (never along-the-tunnel) neighbors that aren't already solid — de-duplicated
+  via a `Map` keyed by coordinate string, since two adjacent water positions in the same
+  row can share a lateral neighbor.
+- If water sat specifically at the row's actual CEILING (not an interior corridor
+  position one level down), one additional check looks one block above that ceiling for
+  more water and adds a "roof cap" seal position if found.
+
+The result rides on the plan as `UndergroundRailStep.sealPositions` (empty for every
+ordinary dry row) and a plan-level `totalSealCount`/`terrainSummary.waterRowsSealed` for
+reporting. `UndergroundExecutionStrategy` places these via a new `TunnelExcavator.sealPositions()`
+method (a free, no-resource-cost placement — reusing `builder/TunnelExcavator.js`'s
+established precedent for excavation-adjacent writes rather than introducing a second
+material-selection system, per Project Prompt 18's explicit "do not add a separate
+material-selection system for Underground Mode") — immediately after excavating that
+row, before the rail-spot clearance re-verification. The FLOOR check (one below the
+rail) is unchanged and still rejects `BLOCKED_BY_WATER` outright: sealing walls off a
+corridor's SIDES and CEILING, it does not fabricate a floor over open water, which would
+be a materially different (and much larger) feature.
+
+**A real gap found and fixed, again by tracing every consumer by hand rather than
+assuming the plan-side change was sufficient:** `TunnelExcavator.excavateRow()` — shared
+by BOTH Underground Mode's corridor excavation and Normal Mode's incidental hill-tunnels
+— unconditionally rejected any `isLiquid` block as a `HAZARD`, regardless of what
+`planUnderground()` now planned for. Fixed by adding an explicit, opt-in
+`{ allowLiquid: true }` parameter (default `false`, preserving Normal Mode's hill-tunnel
+behavior completely unchanged — water was never in that feature's scope and still
+correctly aborts), passed only by `UndergroundExecutionStrategy`'s corridor excavation
+call. `HAZARD_BLOCK_ID_SET` (which lava is always a member of) is still checked FIRST,
+unconditionally, ahead of the liquid check — so lava is never excavated by either mode
+regardless of `allowLiquid`, honoring Project Prompt 18's explicit "lava must remain
+protected by the existing safety rules... do NOT automatically create lava tunnels."
+
+### 47.7 — `TerrainClassification.LIQUID`: Reserved, Not Deleted
+
+As of this session, `_scanPosition()` never produces `LIQUID` directly — every case that
+used to map to it now resolves through one of §47.3's three paths instead. Rather than
+retiring the enum value the way `GAP`/`OBSTRUCTED` were retired in §36.1 (a genuinely
+different situation — those became actively FALSE the moment slopes shipped; `LIQUID`
+just becomes unreachable, which is a much smaller, purely defensive concern), it's kept
+in `TerrainClassification.js`, `PathValidator.js`'s `CLASSIFICATION_TO_REASON`, and
+`PathCategory.js`'s default-branch fallback — all three already had an explicit,
+documented "fail safe on an unrecognized/future classification" posture before this
+session, and `LIQUID` now simply exercises that same defensive path instead of its own
+dedicated one. Each of the three carries an updated doc comment explaining this rather
+than leaving a silent, unexplained "why does this still exist" for a future reader.
+
+### 47.8 — Multiplayer
+
+No new shared state anywhere in this session's changes. `WaterDetector.js` is pure
+functions with no module-level mutable state at all. Every new field
+(`isUnderwater`/`waterInfo` on a `TerrainPositionFact`, `sealPositions` on an
+`UndergroundRailStep`) is carried on the same per-request `TerrainScanResult`/
+`BridgePlan`/`UndergroundPlan` objects this project has always constructed fresh, per
+build, per player — nothing persists across builds or is shared between concurrent
+sessions. Two players building simultaneously through different (or even overlapping)
+bodies of water get completely independent plans, exactly like every other mode-specific
+field already established (`bridgeHeight`/`undergroundDepth`/`bridgeMaterialId`).
+
+### 47.9 — Performance
+
+Water-specific work is strictly opt-in, never unconditional: `hasLiquidAbove()` is only
+ever called when a rail spot's own block is already confirmed liquid (Normal Mode) or
+when a row's ceiling was already confirmed liquid (Underground Mode) — an ordinary dry
+path/tunnel triggers zero extra reads beyond what it already needed. `findLateralSealPositions()`
+similarly only ever runs for a row that already touched water, and reads exactly 2
+lateral neighbors per water position in that row (bounded by `clearance`, 2-3 positions)
+— never a full ring, never an extra vertical shaft, never a whole-body-of-water scan.
+`GapAnalyzer`'s existing `MAX_DEPTH_SEARCH`/`RAVINE_DEPTH_THRESHOLD` bounds (Project
+Prompt 13, unchanged) already cap how far the deep-water-crossing detection searches
+downward — reused, not widened.
+
+### 47.10 — Known Limitations (disclosed, not hidden)
+
+- **Underground's landing buffer** (the terminal one-extra-position safety pocket, §46.3)
+  is NOT sealed if it happens to be water — it's simply omitted (best-effort, unchanged
+  from its existing behavior for any other unsafe condition there). A tunnel that ends
+  exactly at the edge of a water body could lose its landing pocket specifically to
+  water, same as it already could to an unbreakable block or a hazard.
+- **A tunnel corridor whose water pocket is wider than one lateral block on either side**
+  (i.e. a large aquifer, not a thin vein) gets its immediate two lateral faces sealed,
+  which is sufficient to keep the CORRIDOR interior dry, but the seal itself does not
+  extend further outward — this is intentional (see PERFORMANCE above and the explicit
+  "not a massive solid structure" scope line), not an oversight, but worth stating
+  plainly: this is a thin, corridor-shaped seal, not a full excavation-boundary shell.
+- **Normal Mode's shallow-water threshold is a single fixed layer** — exactly one block
+  of water over solid ground is safe; two or more is rejected outright with no
+  in-between "partially submerged, ride carefully" tier. A simple, deterministic rule
+  was chosen over a more nuanced depth-based one, consistent with this project's
+  standing preference for an honest, simple rule over undisclosed complexity.
+- **No in-game verification.** Every claim in this section is backed by
+  `tests/water.test.mjs`'s 55 assertions against a synthetic world, not a live client —
+  see tests/README.md's own disclosure of this, and the standing theme across every
+  session's Validation Performed section in this document.
+
+### 47.11 — Validation Performed
+
+- **`node --check`** across every script file in `BP/scripts/` — 0 failures.
+- **A real, executable Node test harness, committed to the repository** (`tests/`)
+  rather than left in a session-local environment — closing a gap this document has
+  flagged repeatedly across multiple prior sessions (§33.2, §34.5: "no automated
+  mocked-test harness was present in the uploaded project archive"). 55 assertions,
+  covering `WaterDetector.js`'s primitives directly, all three of Normal Mode's water
+  classifications (including that the deep-lake-crossing case correctly reuses
+  `GapAnalyzer`'s existing machinery), Bridge Mode's water tolerance (including a pier
+  genuinely rising through a water column to real ground, and a bridge whose entire
+  deck sits at the water surface), Underground Mode's corridor sealing (including that
+  dry rows get zero unnecessary seal positions) and that a liquid floor / lava are both
+  still correctly rejected outright, `PathValidator`'s new rejection reason from both
+  detection paths, and a short regression block (flat dry terrain, a plain ±1 ascend,
+  existing-rail crossing recognition, Bridge's minimum-length rejection, Underground's
+  unbreakable-block rejection) confirming none of this session's changes disturbed
+  previously-shipped behavior.
+- **Two real bugs found and fixed by this process before shipping**, both detailed
+  above: `_resolveSteppedPosition()`'s missing `WATER_TOO_DEEP` terminal case (caught by
+  the test harness itself, §47.3) and `TunnelExcavator.excavateRow()`'s unconditional
+  liquid rejection (caught by manually tracing every consumer of the changed
+  `planUnderground()` behavior, §47.6 — the test harness does not exercise execution
+  strategies at all, since they import `@minecraft/server` directly; see tests/README.md).
+- **Not yet confirmed in-game** — everything above is a planning-side/Node-only
+  verification. See ROADMAP.md's new Phase 18 testing checklist.

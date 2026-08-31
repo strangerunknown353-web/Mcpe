@@ -910,3 +910,60 @@ consecutive session on a base that has still never been confirmed in-game — se
   clean across all 73 files. 77 localization keys verified 1:1 against `en_US.lang`, no
   duplicates or orphans.
 - **Not yet confirmed in-game.**
+
+### Project Prompt 18 — Underwater Railway & Water-Safe Construction
+- **Added: new `terrain/WaterDetector.js`** — the shared water-detection primitives
+  every mode's water handling is built from (`hasLiquidAbove`, `isSourceBlock`,
+  `perpendicularOffsets`, `findLateralSealPositions`), mirroring `GapAnalyzer.js`'s/
+  `BridgeDetector.js`'s established "detection only, reuse `readBlock`" pattern.
+  ARCHITECTURE.md §47.2.
+- **Normal Mode now safely builds through shallow water.** A single layer of water over
+  solid ground (`FLAT_SAFE`, `isUnderwater: true`) is buildable — the rail simply
+  displaces the water block, no execution-side change needed. Water stacked any deeper,
+  or a drop into a body of water with no floor (reusing `GapAnalyzer`'s existing
+  `WATER_CROSSING` gap type, wired to a message for the first time), rejects with a new,
+  specific `WATER_CROSSING_UNSAFE` reason naming Bridge/Underground Mode as the
+  alternative. ARCHITECTURE.md §47.3, §47.5.
+- **Bridge Mode now passes over water instead of rejecting a wet deck/headroom.**
+  `planBridge()`'s liquid checks now fold into "clear" rather than reject —
+  `BridgeExecutionStrategy`'s own execution-time re-check was found and fixed to match
+  (it would otherwise have halted a now-valid plan mid-build). Piers already correctly
+  rose through water to real ground (Project Prompt 16); that part needed no change.
+  `BridgeRejectionReason.BLOCKED_BY_LIQUID` is no longer produced, kept as a documented,
+  unreachable value. ARCHITECTURE.md §47.4.
+- **Underground Mode now waterproofs a tunnel instead of rejecting or flooding it.**
+  Corridor water is excavated and its lateral/roof faces sealed with a thin,
+  free-of-charge solid lining (new `TunnelExcavator.sealPositions()`,
+  `UNDERGROUND_CONFIG.SEAL_BLOCK_ID`) — never a massive structure. A liquid FLOOR is
+  still correctly rejected outright (sealing doesn't fabricate a floor over nothing).
+  Fixed a real gap along the way: `TunnelExcavator.excavateRow()` unconditionally
+  rejected any liquid — added an explicit, opt-in `allowLiquid` parameter (default off,
+  so Normal Mode's unrelated hill-tunnels are completely unaffected) used only by
+  Underground's own corridor excavation. Lava remains fully protected in every mode,
+  unconditionally, regardless of these changes. ARCHITECTURE.md §47.6.
+- **`TerrainClassification.LIQUID` is reserved, not deleted** — no longer produced
+  directly, kept for defensive symmetry with `PathValidator`'s/`PathCategory`'s existing
+  unrecognized-classification fallbacks. ARCHITECTURE.md §47.7.
+- **Files created:** `terrain/WaterDetector.js`; `tests/mockWorld.mjs`,
+  `tests/water.test.mjs`, `tests/README.md` (this project's first committed, executable
+  test harness — see ARCHITECTURE.md §47.11 for why this closes a gap flagged across
+  multiple prior sessions).
+- **Files modified:** `terrain/TerrainScanner.js` (`_scanPosition()`'s water
+  classification, `_resolveSteppedPosition()`'s new terminal case, `planBridge()`'s/
+  `planUnderground()`'s water handling, new `underwaterCount`/`totalSealCount` summary
+  fields), `terrain/TerrainClassification.js` (`LIQUID` doc), `terrain/PathValidator.js`
+  (new `WATER_CROSSING_UNSAFE` reason), `terrain/UndergroundPlan.js`/
+  `UndergroundValidation.js` (`sealPositions` field + check), `config/UndergroundConfig.js`
+  (`SEAL_BLOCK_ID`), `builder/TunnelExcavator.js` (`sealPositions()` method, `allowLiquid`
+  option), `builder/strategies/UndergroundExecutionStrategy.js` (seal placement, passes
+  `allowLiquid: true`), `builder/strategies/BridgeExecutionStrategy.js` (water-tolerant
+  re-check), `core/pipeline/stages/TerrainScanningStage.js` (log lines),
+  `localization/LocalizationKeys.js` + `en_US.lang` (new key, two corrected messages
+  whose old wording no longer matched reality), `config/Constants.js` + both manifests
+  (version 0.1.10 → 0.1.11).
+- **Validation:** new 55-assertion Node test suite (`tests/water.test.mjs`), all passing
+  — full detail, including two real bugs this process caught and fixed before shipping
+  (a missing terminal case in `_resolveSteppedPosition()`, and `TunnelExcavator`'s
+  unconditional liquid rejection), in ARCHITECTURE.md §47.11. `node --check` clean
+  across every script file.
+- **Not yet confirmed in-game.**

@@ -85,4 +85,23 @@ export const UNDERGROUND_CONFIG = Object.freeze({
    * scoped out.
    */
   ORE_POLICY: "PROTECT_VALUABLE",
+
+  /**
+   * WATERPROOF TUNNEL (Project Prompt 18): the block used to seal the
+   * lateral/roof faces where excavation intersects a body of water — see
+   * terrain/WaterDetector.js's `findLateralSealPositions()` and
+   * terrain/TerrainScanner.js's `planUnderground()` for how those positions
+   * are found. Chosen for the same reason `BridgeConfig.js`'s
+   * `FALLBACK_MATERIAL_ID` uses cobblestone: solid, non-flammable, and
+   * doesn't interact unusually with water. Placed for free, like every
+   * other excavation-adjacent write this addon makes (see
+   * builder/TunnelExcavator.js's established "no resource cost" precedent)
+   * — sealing a tunnel against flooding is a structural safety necessity of
+   * tunneling through water, not a player-chosen material the way Bridge
+   * Mode's deck is (Project Prompt 18 explicitly asked not to introduce a
+   * second material-selection system for Underground Mode). Flagged for
+   * your review like every other unspecified default in this project — a
+   * one-line change, nothing else depends on the specific block chosen.
+   */
+  SEAL_BLOCK_ID: "minecraft:stone",
 });

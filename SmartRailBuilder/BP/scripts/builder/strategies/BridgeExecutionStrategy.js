@@ -40,6 +40,14 @@ import { LocalizationKeys } from "../../localization/LocalizationKeys.js";
  *      part of, applied here identically to how StraightRailStrategy and
  *      UndergroundExecutionStrategy already apply it.
  *
+ * PROJECT PROMPT 18 ADDENDUM: WATER-TOLERANT DECK RE-CHECK
+ *   `planBridge()` now accepts a liquid deck/headroom position (the bridge
+ *   passes over water rather than rejecting outright — see
+ *   terrain/TerrainScanner.js). This class's own per-block re-check
+ *   (`stillClear` in the rail-placement loop below) is updated to match:
+ *   a deck position that's still water when its turn comes is exactly as
+ *   placeable as one that's still air, not a "became obstructed" stop.
+ *
  * `path` IS A BridgePlan HERE, NOT A TerrainPositionFact[]
  *   RailBuildStrategy.js's contract deliberately leaves `path`'s exact
  *   shape to each strategy — see that file's contract doc.
@@ -168,7 +176,11 @@ export class BridgeExecutionStrategy {
         continue;
       }
 
-      const stillClear = block.isAir || REPLACEABLE_BLOCK_ID_SET.has(block.typeId);
+      // WATER DETECTION (Project Prompt 18): a deck position may legitimately
+      // be water — planBridge() now accepts that (see terrain/TerrainScanner.js) —
+      // so the re-check here must accept it too, or a plan that passed
+      // planning would incorrectly halt at execution time.
+      const stillClear = block.isAir || block.isLiquid || REPLACEABLE_BLOCK_ID_SET.has(block.typeId);
       if (!stillClear) {
         Logger.warn(`Bridge build stopped for ${player.name}: a rail position became obstructed mid-build.`);
         return this._result(session, "BRIDGE_DECK_OBSTRUCTED_DURING_BUILD");

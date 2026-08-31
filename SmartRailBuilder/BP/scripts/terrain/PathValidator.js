@@ -1,4 +1,5 @@
 import { TerrainClassification } from "./TerrainClassification.js";
+import { PathCategory } from "./PathCategory.js";
 import { LocalizationKeys } from "../localization/LocalizationKeys.js";
 
 /**
@@ -22,6 +23,17 @@ import { LocalizationKeys } from "../localization/LocalizationKeys.js";
  *   GAP_BRIDGE_REQUIRED are retired along with their lang lines — keeping
  *   them would mean a reachable code path with player-facing text that
  *   became false the moment slopes shipped ("Slopes aren't supported yet").
+ *
+ * PROJECT PROMPT 18: WATER-SPECIFIC REJECTION MESSAGE
+ *   Water is no longer folded into the generic "too steep"/HAZARD messages
+ *   for every case. A rail-level water column too deep to safely ride
+ *   through (`unsupportedReason: "WATER_TOO_DEEP"`, set by
+ *   `TerrainScanner._scanPosition()`) and a drop into a body of water
+ *   (`pathCategory: WATER_CROSSING`, from the existing GapAnalyzer/
+ *   PathCategory machinery, unchanged) both now resolve to the same new
+ *   `WATER_CROSSING_UNSAFE` reason and a message that specifically tells
+ *   the player to use Bridge or Underground Mode instead — see
+ *   ARCHITECTURE.md's Project Prompt 18 entry.
  *
  * ROADMAP PHASE 12 CHANGE: SPECIFIC MESSAGES FOR FAILED TUNNEL ATTEMPTS
  *   UNSUPPORTED alone no longer tells the whole story once tunnels can
@@ -71,6 +83,7 @@ import { LocalizationKeys } from "../localization/LocalizationKeys.js";
  *
  * DEPENDENCIES
  *   - terrain/TerrainClassification.js
+ *   - terrain/PathCategory.js (Project Prompt 18, for the WATER_CROSSING check)
  *   - localization/LocalizationKeys.js
  */
 
@@ -82,6 +95,8 @@ export const PathRejectionReason = Object.freeze({
   HAZARD: "HAZARD",
   UNLOADED_CHUNK: "UNLOADED_CHUNK",
   OUT_OF_BOUNDS: "OUT_OF_BOUNDS",
+  /** Added Project Prompt 18: water too deep/wide for Normal Mode to safely carry a player through — see WATER_CROSSING handling in `validate()` below. */
+  WATER_CROSSING_UNSAFE: "WATER_CROSSING_UNSAFE",
 });
 
 /** Classifications PathValidator treats as buildable — never rejected, never looked up in CLASSIFICATION_TO_REASON. */
@@ -125,6 +140,8 @@ const UNSUPPORTED_REASON_TO_REASON = Object.freeze({
   HAZARD: PathRejectionReason.HAZARD,
   UNLOADED: PathRejectionReason.UNLOADED_CHUNK,
   OUT_OF_BOUNDS: PathRejectionReason.OUT_OF_BOUNDS,
+  /** Added Project Prompt 18 — see terrain/TerrainScanner.js's `_scanPosition()` "WATER DETECTION" section. */
+  WATER_TOO_DEEP: PathRejectionReason.WATER_CROSSING_UNSAFE,
 });
 
 /**
@@ -141,6 +158,7 @@ const REASON_TO_LOCALIZATION_KEY = Object.freeze({
   [PathRejectionReason.HAZARD]: LocalizationKeys.PATH_REJECTED_HAZARD,
   [PathRejectionReason.UNLOADED_CHUNK]: LocalizationKeys.PATH_REJECTED_UNLOADED,
   [PathRejectionReason.OUT_OF_BOUNDS]: LocalizationKeys.PATH_REJECTED_OUT_OF_BOUNDS,
+  [PathRejectionReason.WATER_CROSSING_UNSAFE]: LocalizationKeys.PATH_REJECTED_WATER_CROSSING,
 });
 
 /**
@@ -163,7 +181,16 @@ export class PathValidator {
       }
 
       let reason;
-      if (fact.classification === TerrainClassification.UNSUPPORTED && fact.unsupportedReason) {
+      if (fact.classification === TerrainClassification.UNSUPPORTED && fact.pathCategory === PathCategory.WATER_CROSSING) {
+        // Added Project Prompt 18: a drop of more than 1 block into a body
+        // of water (GapAnalyzer's WATER_CROSSING gap type, Project Prompt
+        // 13 — unchanged) is tagged "DEEP_DROP" the same as an ordinary
+        // cliff, so `unsupportedReason` alone can't distinguish "fell off a
+        // cliff" from "fell into a lake" — `pathCategory` is what actually
+        // does, and is checked first, before the generic unsupportedReason
+        // lookup below.
+        reason = PathRejectionReason.WATER_CROSSING_UNSAFE;
+      } else if (fact.classification === TerrainClassification.UNSUPPORTED && fact.unsupportedReason) {
         reason = UNSUPPORTED_REASON_TO_REASON[fact.unsupportedReason] ?? PathRejectionReason.TOO_STEEP;
       } else {
         // Defensive fallback: if TerrainScanner is ever extended with a new
