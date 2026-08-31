@@ -39,6 +39,12 @@
    in this codebase. Non-blocking if wrong: at worst this specific check misses a dimension
    change, still caught mid-build by the existing, unchanged `CancellationWatcher`. See
    ARCHITECTURE.md §51.13.
+8. **`PROTECTED_STRUCTURE_BLOCK_IDS` — please review the list (Project Prompt 24).**
+   `config/UnbreakableBlockRegistry.js`'s new curated list of chests/crafting stations/doors/
+   beds/signs/etc. this addon now never excavates or builds through. Same "flagged for
+   review, one-line change to add or remove an entry" convention as the hazard/unbreakable
+   lists (items #1/#5 above) — not claimed to be exhaustive of every block a player might
+   consider "their structure." See ARCHITECTURE.md §53.2/§53.7.
 
 ## Resolved Questions — Summary (full detail in ARCHITECTURE.md, sections noted)
 - **Prompts 2, 4-9** (§§2, 15, 17, 19, 21, 23-24, 27): see prior TODO history in
@@ -609,6 +615,30 @@ genuine regression evidence, just not a re-run of the original files byte-for-by
       sessions (§52.10) — nothing new this session, since no new player-facing behavior or
       API surface was added.
 
+## Completed — Roadmap Phase 24: Advanced Railway Routing & Terrain Intelligence ✅
+- [x] **Added player-structure protection** — `PROTECTED_STRUCTURE_BLOCK_IDS` (chests,
+      crafting/utility stations, doors, beds, signs, etc.) unioned into the existing
+      `UNBREAKABLE_BLOCK_ID_SET`, protecting them across all three modes with zero changes
+      to any consumer file. §53.2.
+- [x] **Fixed 3 misleading "unbreakable block" messages** ("bedrock or similar" was false
+      for a protected structure) — reworded for accuracy.
+- [x] **Closed 2 real terrain-transition test gaps**: "Depression → Flat" and a descending
+      staircase, both empirically verified against the real scanner. §53.3.
+- [x] **Added `tests/structureProtection.test.mjs`** (14 new assertions) covering all three
+      modes plus bridge-material exclusion.
+- [x] **Confirmed sound, not rewritten**: Normal Mode terrain following, steep-terrain
+      rejection (structurally guaranteed), Bridge/Underground routing, lava safety,
+      existing-rail preservation (re-tested), player intent (no pathfinding exists),
+      performance, and multiplayer isolation. §53.4-§53.6.
+- [x] 343 assertions across 8 test files, all passing. `node --check` clean across 79
+      script files.
+- [x] **New `.mcaddon` packaged, version 0.1.17** — structure verified.
+- [ ] **Awaiting your in-game test pass** — full numbered checklist delivered alongside the
+      `.mcaddon` in this session's final report. One new, honest limitation (§53.7): a
+      player structure made of ORDINARY blocks (a stone wall, a wood house) still cannot be
+      distinguished from natural terrain — only specific block types and existing rails are
+      reliably protected. Every other standing limitation from prior sessions is unchanged.
+
 ## ⚠️ Order Note (Pre-Prompt-18 Bug-Fix Pass)
 Uploaded with four specific bug reports and four screenshots, explicitly instructing
 "DO NOT START PROJECT PROMPT 18 YET." Honored — Project Prompt 18 was not started.
@@ -622,19 +652,20 @@ broken, the packaging fix (bugfix session) and the `.mcaddon` import itself rema
 right place to start ruling things out first, since nothing else can be verified until
 that works.
 
-## Up Next — Roadmap Phase 24+ (not started)
-Per Project Prompt 23's own scope limit (performance/stability audit, no new
-player-facing features), the backlog is unchanged from before this session. See
-ROADMAP.md's Phase 24+ backlog: underground tunnel lighting (ARCHITECTURE.md §45.12), the
-two water-specific follow-ups (ARCHITECTURE.md §47.10), curved rails, undo, blueprint
-save/load, and the rest — now also noting that raising `LENGTH_PRESETS.MAX_SURVIVAL` past
-64 is a real, deliberate option worth considering once this session's performance work is
-confirmed in-game (measured Node-harness cost stays flat well past the current ceiling).
-Project Prompt 24 itself, whenever it arrives, is milestone-gated on your test pass of
-THIS session, per the project's standing workflow — including the items no session's
-tests can confirm without a live client: neighbor-update side effects on a pre-existing
-rail (§48.6), the two `ui/BuildMenu.js` visual-confirmation items (§50.11), and
-`player.dimension`/`Dimension.id` (§51.13) — none of them touched or added to this session.
+## Up Next — Roadmap Phase 25+ (not started)
+Per Project Prompt 24's own scope limit (routing-quality review, no pathfinding, no
+mode-switching), the backlog is unchanged from before this session except that
+`PROTECTED_STRUCTURE_BLOCK_IDS` may want new entries if in-game testing surfaces a common
+player-placed block type this session's list missed. See ROADMAP.md's Phase 25+ backlog:
+underground tunnel lighting (ARCHITECTURE.md §45.12), the two water-specific follow-ups
+(ARCHITECTURE.md §47.10), curved rails, undo, blueprint save/load, raising
+`LENGTH_PRESETS.MAX_SURVIVAL` past 64, and the rest. Project Prompt 25 itself, whenever it
+arrives, is milestone-gated on your test pass of THIS session, per the project's standing
+workflow — including the items no session's tests can confirm without a live client:
+neighbor-update side effects on a pre-existing rail (§48.6), the two `ui/BuildMenu.js`
+visual-confirmation items (§50.11), `player.dimension`/`Dimension.id` (§51.13), and the new
+"ordinary-block player structures can't be detected" limitation (§53.7) — none of them
+touched or added to this session beyond the last.
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.
@@ -642,7 +673,7 @@ The checklist that used to live under this heading now lives under Phase 16, whe
 actual bridge engine has now been built. Heading kept, body intentionally emptied, for
 session-history continuity — not a second, duplicate copy of the same checklist.)
 
-## Backlog (Roadmap Phase 24+, not scheduled yet)
+## Backlog (Roadmap Phase 25+, not scheduled yet)
 - [ ] Curved rail placement (extends `RailPermutationBuilder.js`, per its own design notes)
 - [x] ~~Underwater railways~~ — done, Roadmap Phase 18 (Project Prompt 18). See
       ARCHITECTURE.md §47.

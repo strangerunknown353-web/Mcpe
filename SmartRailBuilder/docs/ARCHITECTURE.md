@@ -5055,3 +5055,161 @@ performance, which only an actual client/server can measure.
   across any of its now-23 sessions. This session's own instructions were explicit that
   claiming otherwise would be dishonest; every "Validation Performed" section in this document,
   across every prior session, has said the same thing for the same reason.
+
+## 53. Advanced Railway Routing & Terrain Intelligence (Roadmap Phase 24, Project Prompt 24)
+
+### 53.1 — Scope: Confirm Route Intelligence Is Already Sound, Add What's Genuinely New
+
+This session's brief was routing QUALITY — terrain following, transitions, mode-specific
+routing, and (new) existing-structure protection — explicitly forbidding any GPS-style
+pathfinding or silent mode-switching. Reviewing every numbered requirement (§1-§17) against
+the actual code: the overwhelming majority was already true, built up carefully across 24
+prior sessions specifically because terrain intelligence has been a recurring, explicit focus
+since Roadmap Phase 5. One genuinely new capability was added (§53.2); two real test gaps
+were closed (§53.3); everything else is CONFIRMED below with the specific mechanism that
+already satisfies it, not silently skipped.
+
+### 53.2 — New: Player-Structure Protection (§11)
+
+Before this session, nothing distinguished a player-placed chest, furnace, door, bed, or sign
+from ordinary terrain — a route that needed to "step over" or tunnel through one would have
+treated it exactly like stone. `config/UnbreakableBlockRegistry.js` gained
+`PROTECTED_STRUCTURE_BLOCK_IDS` (chests, crafting/utility stations, doors/trapdoors, beds,
+signs, item frames, and similar deliberate-construction blocks — flagged for review, same
+convention as every other curated list in this project) and unions it directly into the
+SAME `UNBREAKABLE_BLOCK_ID_SET` every one of its 8 existing consumers
+(`TerrainScanner`/`TunnelDetector`/`TunnelExcavator`/`BridgeSupportBuilder`/`InventoryManager`)
+already treats as "never plan to break or place through this, reject the route instead." This
+means every mode gets the new protection with ZERO changes to any of those files — the exact
+same rejection path, the exact same "no partial destruction before validation" guarantee,
+bedrock and a chest already had.
+
+**Honest limitation this doesn't solve**: vanilla Bedrock has no metadata distinguishing a
+player-built stone-brick bridge pier or wall from ordinary generated stone — there is no
+reliable dynamic signal for "is this part of a structure" the way there was none for
+`Block.isSolid` (§34) or `destructible_by_mining` (this registry's own earlier note). Only
+specific, individually-identifiable block TYPES can be protected this way, not arbitrary
+player construction. The one functionally important part of an existing bridge/tunnel — its
+actual rail track — remains reliably protected regardless, via `RAIL_ITEM_ID_SET`
+(unchanged since Project Prompt 19).
+
+Player-facing messages for `PATH_REJECTED_UNBREAKABLE`/`PATH_REJECTED_BRIDGE_BLOCKED_UNBREAKABLE`/
+`PATH_REJECTED_UNDERGROUND_UNBREAKABLE` were reworded — they previously said "bedrock or
+similar," which would have been actively misleading for a chest (a chest IS breakable in
+vanilla; this addon simply chooses never to break it). Now worded to cover both cases
+honestly, without overclaiming.
+
+### 53.3 — Two Real Test Gaps Closed: "Depression → Flat" and Descending Staircases
+
+Project Prompt 24 §3 explicitly lists "Depression → Flat" and (implicitly, via "consecutive
+valid slopes") a descending staircase among the transitions to verify. `tests/terrain.test.mjs`
+already had an ascending mirror of both (`"Slope → Flat"`, the 3-step ascending staircase) but
+no descending equivalent — the underlying mechanism (confirmed symmetric by
+`utils/DirectionUtils.js`'s own "sloped block belongs to the higher position" rule, unchanged
+since Roadmap Phase 11) was never directly proven for a drop. Two new tests added, empirically
+verified against the real `TerrainScanner` (not assumed from the ascending case): a genuine
+one-block depression that continues FLAT_SAFE at the new, LOWER elevation afterward (mirroring
+the existing ascend-then-flat test exactly), and a genuine 3-step descending staircase reaching
+a flat plateau at the bottom (mirroring the existing ascending staircase test). Both passed on
+the real, unmodified scanner — this was test coverage the terrain logic was missing, not a bug
+in the terrain logic itself.
+
+### 53.4 — Confirmed Sound, Not Rewritten: Terrain Following, Transitions, Steep Rejection (§2-§4)
+
+- **Flat/rise/drop/consecutive slopes**: `TerrainScanner`'s ASCENDING/DESCENDING/FLAT_SAFE
+  resolution (Roadmap Phase 11, Project Prompt 11) already handles every case §2 lists,
+  re-verified by the existing suite plus §53.3's two new tests — no rewrite needed.
+  "Impossible rail slopes"/"floating rails"/"one-block clearance failures" are already
+  structurally prevented: a position that can't resolve to a valid ±1 step or tunnel is
+  UNSUPPORTED, which `PathValidator` rejects outright (never places a floating or
+  impossible-geometry rail).
+- **Steep terrain never silently becomes Bridge/Underground (§4)**: true by construction, not
+  by a runtime check that could have a gap. `buildingMode` is a fixed field on the immutable
+  `BuildRequest` (see core/BuildRequest.js), set once from the player's own menu choice —
+  `PlacementStage`'s `strategiesByMode` lookup means a NORMAL-mode request can never reach
+  `BridgeExecutionStrategy`/`UndergroundExecutionStrategy` code at all, regardless of what
+  terrain analysis finds. When NORMAL mode's local fallbacks (ascend/descend/tunnel) all fail,
+  `PathRejectionReason.TOO_STEEP` is the only outcome — a clear, honest rejection ("Try Bridge
+  Mode or Underground Mode instead," reworded for accuracy in Project Prompt 21), never a
+  silent conversion.
+
+### 53.5 — Confirmed Sound, Not Rewritten: Bridge/Underground Routing (§5-§10, §12-§13)
+
+- **Bridge routing (§5)**: gradual ascent/flat crest/gradual descent, height 1-16 enforced by
+  `ModeConfigValidator` (unchanged since Project Prompt 15) — implemented in the bugfix pass
+  before Project Prompt 18, unchanged since.
+- **Bridge support intelligence (§6)**: lightweight piers at `BridgeConfig.PIER_SPACING`
+  (avoiding a continuous wall), reaching real ground where possible, and
+  `BridgeRejectionReason.SUPPORT_UNAVAILABLE`/`SUPPORT_HAZARD` already reject a plan outright
+  rather than ever placing a floating or broken support — unchanged since the bugfix pass
+  before Project Prompt 18.
+- **Bridge over water (§7)** and **Underground water handling (§9)**: shallow water tolerated,
+  deep/unsafe water rejected, waterproofing seals only the specific lateral/roof positions a
+  tunnel's own corridor actually intersected — never a blanket water removal. Unchanged since
+  Project Prompt 18.
+- **Underground routing (§8)**: depth 1-20 enforced by `ModeConfigValidator`, ramp-then-flat
+  geometry, clearance, entrance/exit via the landing buffer (bugfix pass before Project Prompt
+  18) — unchanged since Project Prompt 17/18.
+- **Lava safety (§10)**: `HAZARD_BLOCK_ID_SET` always wins first in `TunnelExcavator.excavateRow()`
+  regardless of the `allowLiquid` flag (see that method's own comment) — lava is rejected
+  during PLANNING (`TerrainScanner`/`TunnelDetector`), before `TunnelExcavator` ever runs, so no
+  partial excavation can occur before that rejection. Unchanged since Project Prompt 12/18.
+- **Route cost (§13)**: the existing ascend/descend-first, tunnel-only-as-fallback order
+  (Project Prompt 14) already prefers the cheaper option when both are valid — confirmed via
+  the existing "steep-but-thin hill: bored as TUNNEL" test, which only reaches tunneling
+  because a ±1 step genuinely can't resolve a taller rise, not because tunneling was tried
+  first.
+
+### 53.6 — Confirmed Sound, Not Rewritten: Existing Rails, Player Intent, Performance, Multiplayer (§12, §15-§17)
+
+- **Existing railway integration (§12)**: `RAIL_ITEM_ID_SET` (all 4 rail types — rail, powered,
+  detector, activator) preserved, never overwritten, in all three modes — re-tested this
+  session via the full, unmodified regression suite (`execution.test.mjs`'s crossing tests,
+  39/39 passing) rather than assumed. No new bug found.
+- **Player intent (§15)**: no pathfinding was added or considered — direction is fixed by
+  `BuildVector` (one cardinal direction, computed once from the player's facing, Roadmap Phase
+  4) and never re-derived by any terrain logic; only the Y coordinate ever adapts. Structurally
+  incapable of "randomly turning" since nothing in the codebase computes an alternate X/Z path.
+- **Performance (§16)**: `TerrainScanner.scanPath()`/`planBridge()`/`planUnderground()` each
+  scan exactly the requested length (plus fixed, small clearance/headroom margins) — never the
+  surrounding world. Re-confirmed by Project Prompt 23's own direct measurements (§52.9), not
+  re-measured this session since nothing routing-related changed performance-relevant code
+  paths.
+- **Multiplayer (§17)**: every `BuildPlan`/`BuildRequest`/inventory report is constructed fresh
+  per pipeline run from that call's own live player/dimension — there is no shared cache of
+  any kind for a second player's plan to read. Unchanged since the architecture was
+  established; re-confirmed via the existing multiplayer isolation tests across
+  `execution.test.mjs`, `integration.test.mjs`, and `performanceStability.test.mjs`.
+
+### 53.7 — Known Limitations (disclosed, not hidden, carried forward from prior sessions)
+
+- **Player-built structures using ordinary blocks (a stone wall, a wood-plank house) cannot be
+  distinguished from natural terrain** — only the curated `PROTECTED_STRUCTURE_BLOCK_IDS` list
+  (§53.2) and existing rails are reliably protected. This is a genuine, structural limitation
+  of the platform (no metadata exists to detect this), not an oversight.
+- Every limitation from §52.10 remains: `player.dimension`/`Dimension.id` is still new,
+  unconfirmed API surface; the two `ui/BuildMenu.js` visual-confirmation items and
+  neighbor-update side effects on a pre-existing rail remain unconfirmable without a live
+  client; this project's configured maximum build length remains 64.
+- **No in-game verification for anything in this or any prior session.** Every claim above is
+  a Node-only, mocked-world verification — see §53.8 and the Minecraft PE test checklist
+  delivered alongside this session's `.mcaddon`.
+
+### 53.8 — Validation Performed
+
+- `node --check` across all 79 script files — 0 failures.
+- **343 assertions across 8 test files, all passing**: 55 (`water.test.mjs`, unchanged), 39
+  (`execution.test.mjs`, unchanged), 29 (`integration.test.mjs`, unchanged), 25
+  (`uiMenu.test.mjs`, unchanged), 59 (`buildPlanSafety.test.mjs`, unchanged), 44
+  (`performanceStability.test.mjs`, unchanged), 78 (`terrain.test.mjs`, +10 new transition
+  assertions), and 14 new (`structureProtection.test.mjs`).
+- `LocalizationKeys`↔`RP/texts/en_US.lang` cross-check: 0 missing, 0 orphaned keys (no new
+  keys added — only 3 existing messages reworded for accuracy).
+- The addon's `.mcaddon` was rebuilt and its internal structure verified (manifests parse as
+  valid JSON, all three version fields agree at 0.1.17, both `.mcpack` archives contain a
+  `manifest.json` at their own root, the outer `.mcaddon` contains exactly the two `.mcpack`
+  files) — see the delivered file and this session's final report for the exact result.
+- **Not yet confirmed in-game** — nothing in this project has been play-tested by a human
+  across any of its now-24 sessions. This session's own instructions were explicit that
+  claiming otherwise would be dishonest; every "Validation Performed" section in this document,
+  across every prior session, has said the same thing for the same reason.

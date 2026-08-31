@@ -1188,7 +1188,43 @@ their real boundary values, an underwater railway, rail intersections, Survival/
 resource behavior, cancellation, disconnect, death, two-player simultaneous builds, and
 repeated builds (including immediately after a cancelled one).
 
-## Phase 24+ — Reserved for Future Features (planned only when reached)
+## Phase 24 — Advanced Railway Routing & Terrain Intelligence (Project Prompt 24) — COMPLETE (awaiting in-game confirmation)
+
+Status: a routing-quality review across the entire terrain/mode-specific planning system,
+explicitly forbidding any GPS-style pathfinding or silent mode-switching. Most of what was
+asked was already true — built up deliberately across 24 prior sessions specifically because
+terrain intelligence has been a recurring focus since Roadmap Phase 5 — and is documented as
+CONFIRMED (with the exact mechanism), not silently skipped. One genuinely new capability:
+`config/UnbreakableBlockRegistry.js` gained `PROTECTED_STRUCTURE_BLOCK_IDS` (chests,
+crafting/utility stations, doors, beds, signs, and similar deliberate-construction blocks),
+unioned into the same set every routing consumer already treats as "never plan to break this,
+reject the route instead" — every mode now protects a player's chest/furnace/door/bed exactly
+like bedrock, with zero changes to the terrain scanner, tunnel excavator, or bridge support
+builder themselves. Two real test gaps were closed: "Depression → Flat" and a descending
+staircase, both empirically verified against the real (unmodified) terrain scanner rather than
+assumed symmetric with their already-tested ascending equivalents. Confirmed, not rewritten:
+Normal Mode terrain following and transitions, steep-terrain rejection (structurally
+guaranteed — mode is fixed on the immutable BuildRequest, never re-decided by terrain
+analysis), Bridge/Underground routing and support intelligence, lava-first hazard ordering
+(never a partial excavation before rejection), existing-rail preservation (re-tested via the
+full regression suite, not assumed), player intent (no pathfinding exists or was added — only
+the Y coordinate ever adapts), performance (still scans only the requested route, re-confirmed
+via Project Prompt 23's own measurements), and multiplayer isolation. See ARCHITECTURE.md §53
+for the complete write-up, including the one honest limitation this doesn't solve: a
+player-built structure made of ORDINARY blocks (a stone wall, a wood house) still can't be
+distinguished from natural terrain — only specific, individually-identifiable block types and
+existing rails can be reliably protected on this platform. **A new, testable `.mcaddon` was
+packaged and delivered this session** — version 0.1.17. 343 assertions across 8 test files,
+all passing; `node --check` clean across 79 script files.
+
+### Phase 24 Manual Testing Checklist
+See this session's final report (delivered alongside the `.mcaddon`) for the complete,
+numbered 25-item Minecraft PE testing checklist covering terrain-following in all three
+modes at their boundary values, steep-terrain rejection, an underwater tunnel, lava safety,
+an existing railway and structure, resource behavior, cancellation, a long build, and
+multiplayer.
+
+## Phase 25+ — Reserved for Future Features (planned only when reached)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is
 currently dark and will spawn mobs; worth a deliberate decision) · cave-floor filling for
 Underground Mode (BridgeSupportBuilder is the natural reuse) · curved rails · undo
@@ -1202,8 +1238,10 @@ buffer against water too (currently just omitted when unsafe, see ARCHITECTURE.m
 in-game testing shows the current thin seal is ever insufficient · an actual undo/rollback
 mechanism built on top of Project Prompt 22's world modification boundary (§51.4), now that
 every build's exact touched-position set is a real, inspectable value · raising
-`LENGTH_PRESETS.MAX_SURVIVAL` past 64, if in-game testing of this session's performance work
-shows headroom for it (a deliberate decision, not a default to change casually).
+`LENGTH_PRESETS.MAX_SURVIVAL` past 64, if in-game testing of Project Prompt 23's performance
+work shows headroom for it (a deliberate decision, not a default to change casually) ·
+expanding `PROTECTED_STRUCTURE_BLOCK_IDS` (Project Prompt 24) if in-game testing surfaces a
+common player-placed block type this session's list missed.
 
 Each of these gets the same treatment as Phases 2–15: design discussion first, one
 milestone at a time, your testing before moving on.

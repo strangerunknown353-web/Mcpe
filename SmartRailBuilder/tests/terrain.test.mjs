@@ -120,6 +120,57 @@ const UNBREAKABLE = { typeId: "minecraft:bedrock" };
 }
 
 {
+  // Depression followed by flat terrain (Project Prompt 24 §3 — the mirror
+  // case of "Slope -> Flat" above, using a drop instead of a rise): descend
+  // once, then the new, LOWER elevation continues flat, rather than
+  // climbing straight back up. Both (2,63,0) and (3,63,0) cleared, so
+  // index 3's flat check finds solid ground one level down from the
+  // original — the "new floor," not a return to the old one.
+  const dim = createMockDimension({ groundY: 63, overrides: { "2,63,0": { typeId: "minecraft:air" }, "3,63,0": { typeId: "minecraft:air" } } });
+  const result = scanner.scanPath(createBuildVector({ x: 0, y: 64, z: 0 }, "east"), 4, dim);
+  assertEqual(result.positions[1].classification, TerrainClassification.FLAT_SAFE, "flat before the depression");
+  assertEqual(result.positions[2].classification, TerrainClassification.DESCENDING, "the depression itself");
+  assertEqual(result.positions[3].classification, TerrainClassification.FLAT_SAFE, "flat terrain after the depression, at the new LOWER elevation");
+  assertEqual(result.positions[3].position.y, 63, "flat-after-depression is at the lowered elevation, not back at the original one");
+}
+
+{
+  // Consecutive descending slopes (Project Prompt 24 §3's "multiple
+  // slopes" case, descending direction — mirrors the ascending staircase
+  // test above): a genuine 3-step descent, then a flat plateau at the
+  // bottom, using the same "clear each step's own column, contiguous risers"
+  // construction as the ascending version.
+  const AIR = { typeId: "minecraft:air" };
+  const dim = createMockDimension({
+    groundY: 66,
+    overrides: {
+      "2,66,0": AIR,
+      "3,66,0": AIR,
+      "3,65,0": AIR,
+      "4,66,0": AIR,
+      "4,65,0": AIR,
+      "4,64,0": AIR,
+      "5,66,0": AIR,
+      "5,65,0": AIR,
+      "5,64,0": AIR,
+      "6,66,0": AIR,
+      "6,65,0": AIR,
+      "6,64,0": AIR,
+      "7,66,0": AIR,
+      "7,65,0": AIR,
+      "7,64,0": AIR,
+    },
+  });
+  const result = scanner.scanPath(createBuildVector({ x: 0, y: 67, z: 0 }, "east"), 8, dim);
+  assertTrue(result.buildReady, "descending staircase: buildReady");
+  assertEqual(result.positions[2].classification, TerrainClassification.DESCENDING, "descending staircase step 1");
+  assertEqual(result.positions[3].classification, TerrainClassification.DESCENDING, "descending staircase step 2");
+  assertEqual(result.positions[4].classification, TerrainClassification.DESCENDING, "descending staircase step 3");
+  assertEqual(result.positions[4].position.y, 64, "descending staircase reaches the expected final depth (3 consecutive -1 steps)");
+  assertEqual(result.positions[5].classification, TerrainClassification.FLAT_SAFE, "flat plateau at the bottom of the descending staircase");
+}
+
+{
   // Steep hill: a rise of more than 1 block that IS tunnelable (a thin
   // spike/wall) — Normal Mode bores through automatically (Roadmap Phase 12,
   // unchanged), never a sudden vertical jump.

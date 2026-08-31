@@ -1245,3 +1245,49 @@ consecutive session on a base that has still never been confirmed in-game — se
 - **Not yet confirmed in-game** — this session's own instructions were explicit that
   claiming otherwise without an actual Minecraft launch would be dishonest; none of
   this project's 23 sessions has been play-tested by a human.
+
+### Project Prompt 24 — Advanced Railway Routing & Terrain Intelligence — 2026-08-31
+
+- **Added: player-structure protection.** `config/UnbreakableBlockRegistry.js` gained
+  `PROTECTED_STRUCTURE_BLOCK_IDS` (chests, crafting/utility stations, doors/trapdoors, beds,
+  signs, item frames, and similar deliberate-construction blocks), unioned into the same
+  `UNBREAKABLE_BLOCK_ID_SET` every routing consumer already treats as "never plan to break
+  this, reject the route instead" — every mode now protects a player's chest/furnace/door/bed
+  exactly like bedrock, with zero changes to `TerrainScanner`/`TunnelDetector`/
+  `TunnelExcavator`/`BridgeSupportBuilder`/`InventoryManager` themselves. ARCHITECTURE.md
+  §53.2.
+- **Fixed: three "unbreakable block" rejection messages** that previously said "bedrock or
+  similar," which would have been actively misleading for a protected structure (a chest IS
+  breakable in vanilla; this addon simply chooses never to break it) — reworded to be
+  accurate for both cases.
+- **Added: two real terrain-transition test gaps closed** — "Depression → Flat" and a
+  descending staircase, both explicitly asked for by this session and empirically verified
+  against the real, unmodified `TerrainScanner` rather than assumed symmetric with their
+  already-tested ascending equivalents (`tests/terrain.test.mjs`, +10 assertions).
+  ARCHITECTURE.md §53.3.
+- **Added: `tests/structureProtection.test.mjs`** (14 new assertions) — proves the new
+  protection across all three modes (a chest at the rail's own spot, in an excavation volume,
+  and on a bridge deck position all reject the route with the block untouched) plus that a
+  held chest is never offered as bridge material.
+- **Confirmed sound, not rewritten** (reviewed against the full §1-§17 checklist, only real
+  findings acted on): Normal Mode terrain following and transitions, steep-terrain rejection
+  (structurally guaranteed by `buildingMode` being fixed on the immutable `BuildRequest`),
+  Bridge/Underground routing and support intelligence, lava-first hazard ordering, existing-rail
+  preservation (re-tested via the full regression suite), player intent (no pathfinding exists
+  anywhere in the codebase), performance, and multiplayer isolation. ARCHITECTURE.md
+  §53.4-§53.6.
+- **Files created:** `tests/structureProtection.test.mjs`.
+- **Files modified:** `BP/scripts/config/UnbreakableBlockRegistry.js` (new
+  `PROTECTED_STRUCTURE_BLOCK_IDS`/`PROTECTED_STRUCTURE_BLOCK_ID_SET`, unioned into
+  `UNBREAKABLE_BLOCK_ID_SET`), `RP/texts/en_US.lang` (3 messages reworded),
+  `tests/terrain.test.mjs` (2 new test blocks), `config/Constants.js` + both manifests
+  (version 0.1.16 → 0.1.17).
+- **Packaged a new, testable `.mcaddon`** — version 0.1.17, structure verified (manifests
+  valid, all three version references agree, both `.mcpack` archives correctly rooted,
+  `.mcaddon` contains exactly the 2 expected `.mcpack` files).
+- **Validation:** 343 assertions across 8 test files (319 unchanged + 10 new in
+  `terrain.test.mjs` + 14 new in `structureProtection.test.mjs`), all passing. `node --check`
+  clean across all 79 script files. Full detail in ARCHITECTURE.md §53.8.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of
+  this project's 24 sessions has been play-tested by a human.

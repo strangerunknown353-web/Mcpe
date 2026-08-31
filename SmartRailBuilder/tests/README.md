@@ -18,6 +18,7 @@ node tests/integration.test.mjs
 node tests/uiMenu.test.mjs
 node tests/buildPlanSafety.test.mjs
 node tests/performanceStability.test.mjs
+node tests/structureProtection.test.mjs
 ```
 
 No dependencies, no build step — plain Node (22+), ESM (`.mjs`).
@@ -223,6 +224,17 @@ specifics no prior suite exercised:
   "passed" at first. Fixed by passing `buildingMode` through; kept here
   since it's exactly the kind of test-authoring mistake worth naming, not
   smoothing over.
+
+`structureProtection.test.mjs` (Project Prompt 24) — the new player-structure
+protection (`config/UnbreakableBlockRegistry.js`'s `PROTECTED_STRUCTURE_BLOCK_IDS`):
+a chest at the rail's own spot (NORMAL), inside an excavation volume
+(UNDERGROUND), and on a bridge deck position (BRIDGE) all reject the route
+with the chest itself left completely untouched — proven, not assumed, for
+each mode independently, since each mode's routing code reads
+`UNBREAKABLE_BLOCK_ID_SET` at a different point. Also proves a held chest is
+never offered as bridge material. `terrain.test.mjs` also gained two new
+transition tests this session ("Depression → Flat" and a descending
+staircase) — see that file directly, not a new suite.
 
 ## What's NOT covered (known gaps, not solved this session)
 
