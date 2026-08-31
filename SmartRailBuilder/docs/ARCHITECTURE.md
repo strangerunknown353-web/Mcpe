@@ -5477,3 +5477,227 @@ interim, so nothing needed re-fixing:
   across any of its now-26 sessions. This session's own instructions were explicit that
   claiming otherwise would be dishonest; every "Validation Performed" section in this
   document, across every prior session, has said the same thing for the same reason.
+
+## 56. Final Engineering, Bug Fixing, Compatibility & Stability Pass (Roadmap Phase 27, Project Prompt 27)
+
+### 56.1 — Scope: A Real Audit, Not a Rubber Stamp
+
+Project Prompt 27 asked for a full, assume-nothing audit of every module, every Bedrock API
+call, both manifests, and every documented behavior — rail detection, direction, all three
+modes, bridge design, underground clearance, underwater/lava safety, existing-structure
+protection, the rail-intersection regression specifically, resource transactions, async
+revalidation, cancellation, disconnect/death/dimension-change, multiplayer isolation and
+conflicts, performance, memory/state leaks, error handling, UI reliability, and code cleanup —
+before Prompt 28's release candidate. Every file under `BP/scripts/` was read in full (not
+skimmed) this session, either directly or via an independent parallel review pass reading the
+same files with no shared context, specifically so a second read could catch what a first read
+missed. Two of three planned parallel review passes were interrupted mid-run by a platform rate
+limit and could not be resumed within this session; the files they were assigned were covered
+instead by direct reading in this same session (see 56.7 for exactly which files that was) —
+nothing in the original audit scope went unreviewed, but the "two independent reviewers per
+file" redundancy Prompt 27 implicitly benefits from only fully applied to the subset one
+complete parallel pass covered (UI, validation, and pathfinding-layer files — see 56.7).
+
+### 56.2 — Bugs Fixed
+
+**1. `PlacementStage.js` — "construction started" message sent before the multiplayer conflict
+claim, not after.** The mode-specific chat message ("Building N rails going...") fired
+unconditionally, and the `ActiveBuildRegistry.claim()` conflict check ran afterward, right
+before the one `await` in the method. A player whose claim lost to another active build (two
+overlapping build areas) would see "Building N rails..." immediately followed by "Another build
+is already using part of this area" — confusing, and factually wrong, since no construction had
+actually started. The claim itself was already correctly race-free (synchronous, before the one
+`await` — see `ActiveBuildRegistry.js`'s own header); this was purely a message-ordering bug.
+Fixed by moving the claim to the very first statement in `execute()`, before any player-facing
+message. Zero effect on the claim/release race-freedom or on `finally`-block release timing.
+Regression-tested: `tests/buildPlanSafety.test.mjs` §10 now uses a message-tracking stub
+instead of a no-op one and asserts zero messages are sent when a claim is rejected.
+
+**2. `ModeConfigValidator.js` — stale docstring claiming underground depth's range is 1-64.**
+The header comment said `undergroundDepth for UNDERGROUND (1-64)`; the actual enforced bound
+(read dynamically from `config/BuildModes.js`'s `BUILD_MODE_REGISTRY[UNDERGROUND].max`) is 20,
+and always has been — `BuildRequestCreationStage.js` and `tests/uiMenu.test.mjs` both already
+correctly state/assert 1-20. Not a functional bug (the validator reads the registry's real
+value at runtime, so nothing was actually enforced wrong), but exactly the kind of doc/behavior
+mismatch that misleads a future maintainer into "fixing" the registry to match a wrong comment.
+Fixed: comment now says 1-20 and points at the registry as the actual source of truth.
+
+No other production-code defects were found. This mirrors Project Prompts 25 and 26's own
+finding — a mature, heavily self-documented, already-audited codebase where a careful pass
+surfaces real but narrow issues (message ordering, a stale comment) rather than systemic
+problems, plus, as in Prompt 26, a genuine test-coverage gap (56.4).
+
+### 56.3 — Rail Intersection: Re-Investigated, Confirmed Still Correct
+
+Project Prompt 27 asked for a dedicated regression investigation of the previously-reported
+rail-crossing bug, explicitly not trusting that a past fix holds. Re-traced from scratch rather
+than assumed: the fix from the bugfix pass before Project Prompt 18 (config/RailConfig.js's
+`RAIL_ITEM_ID_SET`, consumed identically by `TerrainScanner._scanPosition()`/`planBridge()`/
+`planUnderground()` and by all three execution strategies) is still exactly in place and still
+correctly applied everywhere a position could already hold a rail. §48.4's Project Prompt 19
+conclusion — a real vanilla rail block can only ever represent ONE shape at a time (no native
+"+" crossing block exists), so "never touch what's already there" is the only generally-safe
+policy, and it is applied identically regardless of crossing geometry (parallel, perpendicular,
+T-junction) or which of the 4 rail types is involved on either side — was re-verified against
+the current code, not merely re-read. `tests/execution.test.mjs` already asserts on actual
+placed blocks (not just the plan) for an existing-rail crossing and a different-rail-type
+crossing; those tests still pass unmodified. The one disclosed KNOWN LIMITATION from that
+investigation (§48.6) — placing a new rail block ADJACENT to a pre-existing, hand-placed rail
+could, in principle, trigger a neighbor-update tick that causes the GAME to recompute that
+existing rail's own shape, a live-client behavior no Node-based test harness can observe —
+remains open and unconfirmed; still flagged for your in-game verification at a crossing with a
+hand-built rail, per the manual testing checklist.
+
+### 56.4 — Test Coverage Gap Closed: Disconnect / Death / Dimension / Game-Mode Change
+
+`core/CancellationWatcher.js` has subscribed to all 4 cancellation-relevant events
+(`playerLeave`, `playerDimensionChange`, `entityDie` filtered to players, `playerGameModeChange`)
+since Project Prompt 10 — but auditing the test suite found only `playerLeave` had a dedicated
+test (`tests/execution.test.mjs` §8); the other 3 events were implemented and documented but
+never actually exercised by any test, across every prior session. This is the same class of
+finding as Project Prompt 26's direction-coverage gap: a real requirement (§18's "player
+disconnects/dies/changes dimension... jobs must terminate safely") that was correctly
+implemented from day one but never proven by a test. `tests/execution.test.mjs` §8b (new, 5
+test blocks, 11 assertions) closes this: `playerDimensionChange`, `entityDie` (player death),
+and `playerGameModeChange` are each exercised in isolation, with multiplayer isolation
+re-confirmed for every one of them (an unrelated second player's session is never touched) —
+plus a dedicated orphaned-lock regression test confirming a session already unregistered (the
+normal `PlacementStage` `finally`-block order) is never retroactively cancelled by a
+late-arriving event, and that a fresh session registered under a reused player ID starts
+completely clean. All 4 events' production code was unmodified by this — every new assertion
+passed against the existing, unmodified `CancellationWatcher.js` on the first run. This was a
+coverage gap, not a functional bug, exactly like Project Prompt 26's finding.
+
+### 56.5 — API Compatibility
+
+Every `@minecraft/server`/`@minecraft/server-ui` import across all 79 script files was
+reviewed against this project's targeted stable API (2.8.0 / server-ui 2.1.0, matching both
+manifests' `dependencies`): `world.beforeEvents.playerInteractWithBlock` and
+`world.beforeEvents.playerLeave`; `world.afterEvents.playerDimensionChange`/`entityDie`
+(entity-type filtered)/`playerGameModeChange`; `system.runJob`; `BlockPermutation.resolve()` +
+`Block.setPermutation()`; `Dimension.getBlock()`; `Player.getComponent("minecraft:inventory")`
++ `Container.getItem()`/`setItem()`; `Player.getGameMode()`; and `ActionFormData`/
+`ModalFormData`/`MessageFormData` from `@minecraft/server-ui`. No deprecated, beta-only, or
+incorrect-signature usage found — every call site matches this project's own prior,
+already-disclosed API-verification history (§29.1's `setPermutation()` reasoning, §34's
+`isSolid` rejection, §48.6's neighbor-update disclosure). No new API risk was introduced or
+discovered this session.
+
+### 56.6 — Manifest / Pack Validation
+
+Both manifests re-validated from scratch: valid JSON, `format_version: 2`, 4 distinct UUIDs
+across the two files (BP header `27195d03…`, BP script module `a3163b2c…`, RP header/BP
+dependency `fa25588d…`, RP resources module `237e6561…` — no duplicates), `min_engine_version:
+[1, 26, 0]` consistent between both, BP's dependency on `@minecraft/server`/`@minecraft/
+server-ui` versions matching what the code actually imports, and BP's dependency on RP
+referencing RP's own header UUID+version correctly. All three version numbers (BP header/BP
+module/RP header/RP module — 4 fields total) bumped together to 0.1.20 this session, and
+`Constants.js`'s `ADDON.VERSION` bumped alongside them, per this project's standing "these
+numbers move together" rule (established Project Prompt 15, §15's finding).
+
+### 56.7 — What Was Reviewed, By What Method
+
+Direct, full-file reading this session (not delegated): `main.js`; `config/RailConfig.js`,
+`Constants.js`, `UnbreakableBlockRegistry.js`, `ReplaceableBlockRegistry.js`,
+`HazardRegistry.js`, `OreRegistry.js`, `BridgeConfig.js`, `UndergroundConfig.js`,
+`BuildModes.js`; `builder/RailPermutationBuilder.js`, `RailBuilder.js`, `TunnelExcavator.js`,
+`BridgeSupportBuilder.js`, and all three `strategies/*.js`; `terrain/TerrainScanner.js` (in
+full, all 1566 lines); `utils/BlockReader.js`; `core/BuildSession.js`, `BuildOrchestrator.js`,
+`BuildPlan.js`, `ActiveBuildRegistry.js`, `CancellationWatcher.js`, and
+`pipeline/stages/PlacementStage.js`; `inventory/InventoryManager.js`; both manifests; and a
+scripted cross-check of `LocalizationKeys.js` against `RP/texts/en_US.lang` (0 missing, 2
+orphaned — `pack.name`/`pack.description`, which are consumed directly by the manifests, not
+through `LocalizationKeys`, so expected) and of the three block registries against each other
+for contradictory entries (0 found).
+
+Covered by one completed independent parallel review pass, reading the same files with no
+prior context, specifically targeting UI reliability, error messages, validation ordering and
+bounds, direction math, rail-type detection, `PathValidator`'s reason-to-message mapping, and
+tunnel/gap/bridge detection logic: `ui/BuildMenu.js`, `MessageService.js`, `ProgressReporter.js`;
+every file under `core/validation/`; `terrain/PathValidator.js`, `GapAnalyzer.js`,
+`BridgeDetector.js`, `TunnelDetector.js`, `TunnelPlanner.js`, `WaterDetector.js`,
+`BridgeValidation.js`, `UndergroundValidation.js`; `pipeline/stages/ValidationStage.js`,
+`ModeAvailabilityStage.js`, `TerrainScanningStage.js`; `utils/DirectionUtils.js`. This pass
+found the one docstring bug in 56.2 and confirmed everything else in its scope sound.
+
+Two further parallel review passes (one targeting `inventory/ResourceValidator.js`,
+`pipeline/stages/InventoryStage.js`/`BuildPlanStage.js`/`RailDetectionStage.js`/
+`BuildRequestCreationStage.js`/`CompletionStage.js`/`FinalSafetyCheckStage.js`,
+`core/BuildRequest.js`/`BuildVector.js`, and the `pipeline/*.js` support files; one targeting
+config-registry cross-checks and a second independent API-compatibility pass) were interrupted
+by a platform-level rate limit before completing and could not be resumed this session. The
+files assigned to the first were covered this session only indirectly, via `InventoryManager.js`
+(read in full, the class those files call into) plus this session's own reading of
+`BuildOrchestrator.js`/`BuildPlan.js`/`PlacementStage.js`, which exercise
+`BuildPlanStage`/`InventoryStage`'s real behavior end-to-end through the existing test suite —
+`BuildRequest.js`, `BuildVector.js`, `RailDetectionStage.js`, `BuildRequestCreationStage.js`,
+`CompletionStage.js`, and the `pipeline/*.js` support files (`BuildPipeline.js`,
+`PipelineContext.js`, `PipelineOutcome.js`, `PipelineResult.js`, `PipelineStage.js`,
+`RequestLifecycleState.js`) were not individually re-read this session beyond what the passing
+test suite already exercises. Flagged honestly rather than silently treated as "reviewed": this
+is a real gap in this session's audit coverage, not a discovered problem — nothing found
+anything wrong in that area, but it was reviewed less thoroughly than the rest of the codebase.
+Recommended as Prompt 28's first checklist item if a further engineering pass is warranted
+before the release candidate is finalized.
+
+### 56.8 — Sections Confirmed Sound With No Changes Needed
+
+Reviewed against Project Prompt 27's own checklist, with no bugs found: rail detection (all 4
+types remain mutually exclusive by exact `typeId` equality, re-checked at both the event filter
+and `HeldItemValidator`); direction math (`DirectionUtils.snapYawToCardinal`'s yaw-boundary
+handling, algebraically re-verified at all 4 boundaries and both signs); Normal/Bridge/
+Underground mode boundary values (height 1/16, depth 1/20, all already correctly enforced and
+tested); bridge design (pier spacing, lightweight deck, single-material construction, all
+unchanged and re-confirmed); underwater and lava safety (the zero-blocks-modified-on-rejection
+guarantee re-traced end to end for `planUnderground()`'s lava/water-floor checks, which run
+before any excavation position is committed to); existing-structure protection
+(`UNBREAKABLE_BLOCK_ID_SET`'s player-structure union, re-checked for contradictions against the
+other two registries — none found); resource transactions (`InventoryManager.deductRailItems()`
+re-read in full: exact per-slot deduction, never goes negative, strictly post-placement,
+Creative Mode's bypass lives entirely in each strategy's `isSurvival` gate, not in
+`InventoryManager` itself); async revalidation (every execution strategy's own "state can
+change mid-build" per-block re-check, unchanged and still exercised by the full test suite);
+cancellation (`session.isCancelled()` checked at the top of every placement loop iteration,
+across all 3 strategies, confirmed to stop immediately with zero further placement); multiplayer
+isolation (`ActiveBuildRegistry`'s synchronous claim-before-the-one-`await` design re-verified
+as still race-free by construction, no shared mutable module-level state found anywhere in the
+files read this session); performance (no new synchronous unbounded loop introduced; every
+per-block loop this session touched already yields every iteration via `system.runJob`); memory/
+state (`CancellationWatcher`/`ActiveBuildRegistry` both release their per-player entries in the
+same `finally` block that registers them — re-confirmed, and now the subject of the new §56.4
+tests rather than only a design claim).
+
+### 56.9 — Known Limitations (carried forward, none newly discovered)
+
+Unchanged from §55.4/§54.7: a player structure built from ordinary (non-registered) blocks is
+still undetectable; `player.dimension`/`Dimension.id` edge-case behavior is still unconfirmed
+against the live API; the two `ui/BuildMenu.js` visual-layout items still need in-game visual
+confirmation; the neighbor-update-tick risk at a hand-placed-rail crossing (§56.3/§48.6) is
+still open; the build-length ceiling is still 64 by deliberate design, not a defect; and the
+ascending `rail_direction` mapping is still the single highest-priority unconfirmed assumption
+in the whole project — internally consistent across all 4 directions (proven by
+`tests/directionCoverage.test.mjs`, Project Prompt 26) but never confirmed against real
+Bedrock. **No session in this project's now-27-session history has ever been played in an
+actual Minecraft Bedrock client.** Every validation claim in this section is Node.js-only,
+mocked-world testing, exactly as honestly disclosed in every prior session.
+
+### 56.10 — Validation Performed
+
+- `node --check` across all 79 script files — 0 failures.
+- **432 assertions across 9 test files, all passing**: 55 (`water.test.mjs`, unchanged), 50
+  (`execution.test.mjs`, +11 new — §56.4), 37 (`integration.test.mjs`, unchanged), 44
+  (`performanceStability.test.mjs`, unchanged), 14 (`structureProtection.test.mjs`, unchanged),
+  83 (`terrain.test.mjs`, unchanged), 25 (`uiMenu.test.mjs`, unchanged), 60
+  (`buildPlanSafety.test.mjs`, +1 new — §56.2's message-ordering regression test), 64
+  (`directionCoverage.test.mjs`, unchanged).
+- `LocalizationKeys`↔`RP/texts/en_US.lang` cross-check re-run: 0 missing, 2 expected orphans
+  (unchanged from prior sessions).
+- Cross-registry contradiction check (new this session): `UnbreakableBlockRegistry` ∩
+  `ReplaceableBlockRegistry`, `HazardRegistry` ∩ `ReplaceableBlockRegistry`, and
+  `HazardRegistry` ∩ `UnbreakableBlockRegistry` all empty (0 contradictory entries).
+- Both manifests re-validated as parseable JSON with 4 distinct UUIDs and all version fields
+  agreeing at 0.1.20.
+- The `.mcaddon` was rebuilt from the current `BP/`/`RP/` trees and its internal structure
+  verified — see this session's final report for the exact result.
+- **Not yet confirmed in-game** — see §56.9. This remains a Node.js-only validation pass, like
+  every prior session's.

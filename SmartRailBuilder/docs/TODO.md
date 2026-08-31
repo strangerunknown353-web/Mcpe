@@ -706,18 +706,57 @@ broken, the packaging fix (bugfix session) and the `.mcaddon` import itself rema
 right place to start ruling things out first, since nothing else can be verified until
 that works.
 
-## Up Next — Roadmap Phase 27: Full Bug-Fixing, Compatibility, Multiplayer & Optimization Pass (not started)
-Per Project Prompt 26's own newly-established schedule, Phase 27 is a dedicated stabilization
-pass — not a feature session. Its focus, per this session's own findings: (1) your in-game
-test pass of THIS session's `.mcaddon` is the top input, especially the ascending
-`rail_direction` mapping (flag #7) since Phase 27 is the natural place to fix it if it turns
-out wrong; (2) anything your testing surfaces across the 30-item checklist delivered this
-session; (3) the items no session's tests can confirm without a live client: neighbor-update
-side effects on a pre-existing rail (§48.6), the two `ui/BuildMenu.js` visual-confirmation
-items (§50.11), `player.dimension`/`Dimension.id` (§51.13), and "ordinary-block player
-structures can't be detected" (§53.7) — none of them touched this session. Per Project Prompt
-26's own "do not add these yet" list, curved rails/pathfinding/undo/blueprints/stations/custom
-items/mobs/branding remain out of scope through at least Phase 28 (release candidate).
+## Completed — Roadmap Phase 27: Final Engineering, Bug Fixing, Compatibility & Stability Pass ✅
+- [x] **Full audit of every module, both manifests, and every documented behavior** —
+      not a new feature session, per Project Prompt 27's own explicit framing. Every
+      script file read this session, directly or via an independent parallel review pass.
+- [x] **Fixed: `PlacementStage.js`'s "construction started" message fired before the
+      multiplayer conflict claim check**, not after — a rejected build (RAIL_CONFLICT)
+      confusingly told the player construction had begun. §56.2.
+- [x] **Fixed: `ModeConfigValidator.js`'s stale docstring** (claimed underground depth
+      1-64; actual, always-correctly-enforced bound is 1-20). §56.2.
+- [x] **Re-investigated the rail-crossing bug from scratch, confirmed still correctly
+      fixed** — `RAIL_ITEM_ID_SET`'s "never touch what's already there" policy re-traced
+      end to end across all 3 strategies and all 4 rail types. §56.3.
+- [x] **Found and closed a real test-coverage gap**: 3 of `CancellationWatcher.js`'s 4
+      cancellation events (dimension change, death, game mode change) were implemented
+      and subscribed since Prompt 10 but never tested — only `playerLeave` was. Added
+      5 new test blocks / 11 assertions in `tests/execution.test.mjs`, including an
+      orphaned-lock regression test. §56.4.
+- [x] **API compatibility, manifests, and config registries all re-validated** — no
+      deprecated/incorrect API usage found; no UUID/version inconsistency; no
+      contradictory entries across the 3 block registries. §56.5-§56.8.
+- [x] **Honestly disclosed: 2 of 3 planned parallel review passes were interrupted by a
+      platform rate limit** before completing; their assigned files were covered only
+      indirectly this session, not individually re-read. Flagged, not hidden. §56.7.
+- [x] 432 assertions across 9 test files, all passing (420 prior + 12 new). `node --check`
+      clean across 79 script files.
+- [x] **New `.mcaddon` packaged, version 0.1.20** — structure verified.
+- [ ] **Awaiting your in-game test pass** — full numbered checklist delivered alongside
+      the `.mcaddon` in this session's final report. Every standing limitation from prior
+      sessions is unchanged (§56.9): the ascending `rail_direction` mapping remains the
+      single highest-priority thing to verify visually; the neighbor-update-tick risk at
+      a hand-placed-rail crossing (§56.3/§48.6) is still open and unconfirmable without a
+      live client.
+
+## Up Next — Roadmap Phase 28: Release Candidate (not started)
+Per Project Prompt 27's own explicit instruction, Prompt 28 was NOT started this session.
+Its focus, per this session's own findings: (1) your in-game test pass of THIS session's
+`.mcaddon` is the top input, especially the ascending `rail_direction` mapping and the
+rail-crossing neighbor-update-tick risk, since Phase 28 is the natural place to fix either
+if in-game testing shows it wrong; (2) anything your testing surfaces across the 40-item
+checklist delivered this session; (3) the items no session's tests can confirm without a
+live client: neighbor-update side effects on a pre-existing rail (§48.6), the two
+`ui/BuildMenu.js` visual-confirmation items (§50.11), `player.dimension`/`Dimension.id`
+(§51.13), and "ordinary-block player structures can't be detected" (§53.7) — none of them
+touched this session; (4) the one honestly-disclosed audit-coverage gap from this session
+(§56.7) — `inventory/ResourceValidator.js`, several pipeline stage files, `BuildRequest.js`/
+`BuildVector.js`, and the `pipeline/*.js` support files were not individually re-read this
+session beyond what the passing test suite already exercises, and are recommended as the
+first checklist item for a further engineering pass if one is warranted before the release
+candidate is finalized. Per Project Prompt 26's own "do not add these yet" list, curved
+rails/pathfinding/undo/blueprints/stations/custom items/mobs/branding remain out of scope
+through at least Phase 28.
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.

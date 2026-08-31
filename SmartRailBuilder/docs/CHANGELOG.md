@@ -1369,3 +1369,59 @@ consecutive session on a base that has still never been confirmed in-game — se
 - **Not yet confirmed in-game** — this session's own instructions were explicit that
   claiming otherwise without an actual Minecraft launch would be dishonest; none of
   this project's 26 sessions has been play-tested by a human.
+
+### Project Prompt 27 — Final Engineering, Bug Fixing, Compatibility & Stability Pass — 2026-08-31
+
+- **Fixed: `PlacementStage.js` sent the "construction started" chat message before checking
+  the multiplayer conflict claim, not after.** A player whose build lost a conflicting claim
+  (`RAIL_CONFLICT`) still received "Building N rails going..." immediately followed by the
+  rejection message, even though no construction had started. Fixed by moving the
+  `ActiveBuildRegistry.claim()` check to the very first statement in `execute()`, before any
+  player-facing message — zero effect on the claim's already race-free, synchronous-before-
+  the-one-`await` design. ARCHITECTURE.md §56.2.
+- **Fixed: `ModeConfigValidator.js`'s docstring claimed underground depth's valid range was
+  1-64.** The actual, always-correctly-enforced bound (read dynamically from
+  `config/BuildModes.js`) is 1-20 — a stale comment mismatch, not a functional bug (runtime
+  enforcement was always correct). ARCHITECTURE.md §56.2.
+- **Re-investigated the previously-reported rail-crossing bug from scratch**, per Project
+  Prompt 27's explicit "do not simply suppress the symptom" instruction — confirmed the
+  existing `RAIL_ITEM_ID_SET` "never touch what's already there" fix (bugfix pass before
+  Project Prompt 18, re-confirmed Project Prompt 19) is still correctly applied across all 3
+  execution strategies and all 4 rail types, with its one disclosed neighbor-update-tick
+  limitation still open and unconfirmable without a live client. ARCHITECTURE.md §56.3.
+- **Found and closed a real test-coverage gap: 3 of `CancellationWatcher.js`'s 4
+  cancellation events had never been tested.** `playerDimensionChange`, `entityDie` (player
+  death), and `playerGameModeChange` have been correctly implemented and subscribed since
+  Project Prompt 10, but only `playerLeave` had a dedicated test. `tests/execution.test.mjs`
+  now covers all 4, each with multiplayer isolation re-confirmed, plus a new orphaned-lock
+  regression test. All new assertions passed against the unmodified production code — a
+  coverage gap, not a functional bug, mirroring Project Prompt 26's direction-coverage
+  finding. ARCHITECTURE.md §56.4.
+- **Confirmed sound, no changes needed:** API compatibility (every `@minecraft/server`/
+  `@minecraft/server-ui` call site re-checked against the targeted stable API), both
+  manifests (UUIDs, versions, dependencies, engine version), rail detection, direction math,
+  Normal/Bridge/Underground boundary values, bridge design, underwater/lava safety,
+  existing-structure protection, resource transaction safety, async revalidation,
+  cancellation, multiplayer isolation, performance, and memory/state cleanup. Cross-registry
+  contradiction check (new this session): `UnbreakableBlockRegistry`/`ReplaceableBlockRegistry`/
+  `HazardRegistry` checked pairwise for overlapping entries — none found. ARCHITECTURE.md
+  §56.5-§56.8.
+- **Honestly disclosed audit-coverage gap:** two of three planned independent parallel review
+  passes were interrupted by a platform rate limit before completing; the files they were
+  assigned were instead covered only indirectly this session (via the classes they call into
+  and the passing test suite), not individually re-read start-to-end. Flagged as Prompt 28's
+  recommended first checklist item rather than silently presented as fully reviewed.
+  ARCHITECTURE.md §56.7.
+- **Files modified:** `BP/scripts/core/pipeline/stages/PlacementStage.js`,
+  `BP/scripts/core/validation/ModeConfigValidator.js`, `tests/buildPlanSafety.test.mjs`,
+  `tests/execution.test.mjs`, `BP/scripts/config/Constants.js` + both manifests (version
+  0.1.19 → 0.1.20).
+- **Packaged a new, testable `.mcaddon`** — version 0.1.20, structure verified (manifests
+  valid, all 4 version fields agree, both `.mcpack` archives correctly rooted, `.mcaddon`
+  contains exactly the 2 expected `.mcpack` files).
+- **Validation:** 432 assertions across 9 test files (420 unchanged/prior + 11 new
+  cancellation-event assertions + 1 new message-ordering regression assertion), all passing.
+  `node --check` clean across all 79 script files. Full detail in ARCHITECTURE.md §56.10.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of
+  this project's 27 sessions has been play-tested by a human.

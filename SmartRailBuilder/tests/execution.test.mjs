@@ -333,6 +333,114 @@ for (const [direction, expectedRailDirection] of [
   watcher.unregisterSession(player2.id);
 }
 
+// ---------------------------------------------------------------------------
+// 8b. CancellationWatcher's other 3 events (Project Prompt 27 — closing a
+//     real test-coverage gap: only playerLeave had a dedicated test before
+//     this session, even though CancellationWatcher.js documents and
+//     subscribes to 4 distinct cancellation-relevant events). Each event is
+//     exercised in isolation, with multiplayer isolation re-confirmed for
+//     every one of them (not just playerLeave) — a second, unrelated
+//     player's session must never be cancelled by another player's event.
+// ---------------------------------------------------------------------------
+
+{
+  // Dimension change (e.g. the player takes a nether portal or an end
+  // portal mid-build).
+  const watcher = new CancellationWatcher();
+  watcher.initialize();
+
+  const player1 = createMockPlayer({ id: "player-1" });
+  const player2 = createMockPlayer({ id: "player-2" });
+  const session1 = new BuildSession(fakeBuildRequest({ player: player1, dimension: {} }), 10);
+  const session2 = new BuildSession(fakeBuildRequest({ player: player2, dimension: {} }), 10);
+  watcher.registerSession(player1.id, session1);
+  watcher.registerSession(player2.id, session2);
+
+  const { world } = await import("@minecraft/server");
+  world.afterEvents.playerDimensionChange.emit({ player: player1 });
+
+  assertTrue(session1.isCancelled(), "dimension change: player1's session cancelled on their own playerDimensionChange");
+  assertEqual(session1.cancelReason, "playerDimensionChange", "dimension change: correct cancel reason");
+  assertEqual(session2.isCancelled(), false, "dimension change: player2's session completely unaffected");
+
+  watcher.unregisterSession(player1.id);
+  watcher.unregisterSession(player2.id);
+}
+
+{
+  // Player death — CancellationWatcher subscribes to entityDie filtered to
+  // minecraft:player and reads event.deadEntity.id (see CancellationWatcher.js).
+  const watcher = new CancellationWatcher();
+  watcher.initialize();
+
+  const player1 = createMockPlayer({ id: "player-1" });
+  const player2 = createMockPlayer({ id: "player-2" });
+  const session1 = new BuildSession(fakeBuildRequest({ player: player1, dimension: {} }), 10);
+  const session2 = new BuildSession(fakeBuildRequest({ player: player2, dimension: {} }), 10);
+  watcher.registerSession(player1.id, session1);
+  watcher.registerSession(player2.id, session2);
+
+  const { world } = await import("@minecraft/server");
+  world.afterEvents.entityDie.emit({ deadEntity: player1 });
+
+  assertTrue(session1.isCancelled(), "player death: player1's session cancelled on their own entityDie");
+  assertEqual(session1.cancelReason, "playerDeath", "player death: correct cancel reason");
+  assertEqual(session2.isCancelled(), false, "player death: player2's session completely unaffected");
+
+  watcher.unregisterSession(player1.id);
+  watcher.unregisterSession(player2.id);
+}
+
+{
+  // Game mode change (e.g. an operator switches the player to Spectator
+  // mid-build) — the fourth and last of CancellationWatcher's events.
+  const watcher = new CancellationWatcher();
+  watcher.initialize();
+
+  const player1 = createMockPlayer({ id: "player-1" });
+  const player2 = createMockPlayer({ id: "player-2" });
+  const session1 = new BuildSession(fakeBuildRequest({ player: player1, dimension: {} }), 10);
+  const session2 = new BuildSession(fakeBuildRequest({ player: player2, dimension: {} }), 10);
+  watcher.registerSession(player1.id, session1);
+  watcher.registerSession(player2.id, session2);
+
+  const { world } = await import("@minecraft/server");
+  world.afterEvents.playerGameModeChange.emit({ player: player1 });
+
+  assertTrue(session1.isCancelled(), "game mode change: player1's session cancelled on their own playerGameModeChange");
+  assertEqual(session1.cancelReason, "playerGameModeChange", "game mode change: correct cancel reason");
+  assertEqual(session2.isCancelled(), false, "game mode change: player2's session completely unaffected");
+
+  watcher.unregisterSession(player1.id);
+  watcher.unregisterSession(player2.id);
+}
+
+{
+  // Orphaned-lock regression: a session unregistered BEFORE its player's
+  // cancellation event fires (the normal PlacementStage try/finally order —
+  // see PlacementStage.js) must not be touched by a late-arriving event, and
+  // must leave no trace in the watcher for a later, unrelated session
+  // registered under the same reused player id.
+  const watcher = new CancellationWatcher();
+  watcher.initialize();
+
+  const player1 = createMockPlayer({ id: "player-1" });
+  const firstSession = new BuildSession(fakeBuildRequest({ player: player1, dimension: {} }), 10);
+  watcher.registerSession(player1.id, firstSession);
+  watcher.unregisterSession(player1.id); // build finished/cancelled/errored — PlacementStage's finally already ran
+
+  const { world } = await import("@minecraft/server");
+  world.beforeEvents.playerLeave.emit({ player: player1 });
+  assertEqual(firstSession.isCancelled(), false, "orphaned lock: an unregistered session is never cancelled by a late event");
+
+  // A brand-new build for the same player (same id, fresh session) must
+  // start completely clean — no stale registration left behind.
+  const secondSession = new BuildSession(fakeBuildRequest({ player: player1, dimension: {} }), 10);
+  watcher.registerSession(player1.id, secondSession);
+  assertEqual(secondSession.isCancelled(), false, "orphaned lock: a new session for the same player id starts uncancelled");
+  watcher.unregisterSession(player1.id);
+}
+
 {
   // Two independent builds' plans never share state — same scanner
   // instance, two different players/build vectors, no cross-contamination.

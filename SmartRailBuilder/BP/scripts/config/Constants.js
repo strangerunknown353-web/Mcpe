@@ -44,8 +44,10 @@ export const ADDON = Object.freeze({
   // CHANGELOG.md's Project Prompt 15 entry and TODO.md for the full write-up of
   // this finding. Bumped to 0.1.13 this session (Project Prompt 20 — Full
   // Integration, Stability & Real-World Test Build); all three numbers
-  // confirmed in sync.
-  VERSION: "0.1.19",
+  // confirmed in sync. Bumped to 0.1.20 for Project Prompt 27 (Final
+  // Engineering, Bug Fixing, Compatibility & Stability Pass) — see
+  // CHANGELOG.md's Project Prompt 27 entry.
+  VERSION: "0.1.20",
 });
 
 /**

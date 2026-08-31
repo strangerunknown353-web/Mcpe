@@ -344,6 +344,13 @@ function buildContextThroughFinalSafetyCheck({
 // 10. PlacementStage: RAIL_CONFLICT — a second player's plan overlaps an
 //     already-active build's claimed positions. Zero blocks placed, and
 //     railBuilder.run() must never even be called.
+//
+//     Project Prompt 27 addition: also proves the claim now happens BEFORE
+//     the mode-specific "construction started" chat message, not after —
+//     see PlacementStage.js's own "BUG FIX (Project Prompt 27)" note. Before
+//     that fix, a conflicting player would see "Building N rails..."
+//     immediately followed by the RAIL_CONFLICT rejection message, even
+//     though no construction had actually started.
 // ---------------------------------------------------------------------------
 {
   const dim = createMockDimension({ groundY: 63 });
@@ -354,7 +361,14 @@ function buildContextThroughFinalSafetyCheck({
       throw new Error("railBuilder.run() must never be called when a RAIL_CONFLICT is detected");
     },
   };
-  const placementStage = new PlacementStage(throwingRailBuilder, cancellationWatcher, noopMessageService, {}, registry);
+  const sentMessages = [];
+  const trackingMessageService = {
+    sendChat(player, key) {
+      sentMessages.push(key);
+    },
+    sendActionBar() {},
+  };
+  const placementStage = new PlacementStage(throwingRailBuilder, cancellationWatcher, trackingMessageService, {}, registry);
 
   // Player A's build already holds (1,64,0)-(5,64,0).
   registry.claim("playerA", ["1,64,0", "2,64,0", "3,64,0", "4,64,0", "5,64,0"]);
@@ -368,6 +382,7 @@ function buildContextThroughFinalSafetyCheck({
   assertEqual(result.reason, "RAIL_CONFLICT", "PlacementStage: correct reason");
   assertEqual(contextB.buildSession, undefined, "PlacementStage: no session created — placement never started");
   assertEqual(dim.getBlock({ x: 4, y: 64, z: 0 }).typeId, "minecraft:air", "PlacementStage: nothing was placed in the conflicting area");
+  assertEqual(sentMessages.length, 0, "PlacementStage: no 'construction started' (or any other) message sent when the conflict claim is rejected");
 
   registry.release("playerA");
 }

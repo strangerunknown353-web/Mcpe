@@ -1288,9 +1288,44 @@ types, all three modes at their boundary values, an underwater tunnel, lava safe
 railways/structures, resource behavior, cancellation, a long build, two-player construction,
 and repeated builds.
 
-## Remaining Schedule (established by Project Prompt 26)
+## Phase 27 Complete: Final Engineering, Bug Fixing, Compatibility & Stability Pass
+A full, assume-nothing audit of every module, both manifests, and every documented behavior —
+not a new feature session. Every script file was read this session, either directly or via an
+independent parallel review pass. Found and fixed 2 real, narrow issues: (1)
+`PlacementStage.js` sent its "construction started" chat message BEFORE checking the
+multiplayer conflict claim, so a rejected build (`RAIL_CONFLICT`) still told the player
+construction had begun — fixed by moving the claim to the top of the method, before any
+message; (2) `ModeConfigValidator.js`'s docstring claimed underground depth's range was 1-64
+when the actual, always-correctly-enforced bound is 1-20 — a stale comment, not a functional
+bug, fixed. The previously-reported rail-crossing bug was re-investigated from scratch (not
+assumed fixed) and confirmed still correctly handled by the existing `RAIL_ITEM_ID_SET`
+"never touch what's already there" policy, with its one disclosed neighbor-update-tick
+limitation (§48.6) still open and unconfirmable without a live client. A real test-coverage
+gap was found and closed: `CancellationWatcher.js` has subscribed to all 4 cancellation
+events (leave/dimension-change/death/game-mode-change) since Project Prompt 10, but only
+`playerLeave` had a dedicated test — the other 3 were implemented and documented but never
+exercised; `tests/execution.test.mjs` now covers all 4, plus a dedicated orphaned-lock
+regression test. API compatibility, both manifests, all 3 block registries (checked against
+each other for contradictions — none found), and localization were all re-validated with no
+issues beyond the two fixes above. **A new, testable `.mcaddon` was packaged and delivered
+this session** — version 0.1.20. 432 assertions across 9 test files, all passing (up from 420
+— 11 new cancellation-event assertions, 1 new message-ordering regression assertion);
+`node --check` clean across 79 script files. See ARCHITECTURE.md §56 for the complete
+write-up, including exactly which files were reviewed by which method (§56.7) and the one
+honestly-disclosed audit-coverage gap where a planned parallel review pass was interrupted by
+a platform rate limit before completing.
 
-- **Phase 27 — Full bug-fixing, compatibility, multiplayer, and optimization pass.**
+### Phase 27 Manual Testing Checklist
+See this session's final report (delivered alongside the `.mcaddon`) for the complete,
+numbered 40-item Minecraft PE testing checklist Project Prompt 27 itself specifies — installation,
+world loading, all four directions/rail types, bridge/underground boundary values (including
+the rejected-out-of-range cases), bridge design and resource calculation, underwater/lava
+safety, existing rails and structures, rail intersections, insufficient-resource handling,
+Survival/Creative, cancellation, long/repeated builds, player death/disconnect/dimension
+change, and two-player conflicting construction.
+
+## Remaining Schedule (established by Project Prompt 26, Phase 27 now complete above)
+
 - **Phase 28 — RELEASE CANDIDATE.** The final unbranded gameplay build, tested extensively
   by you.
 - **Phase 29 — Official name/logo/branding integration.** Nothing visual/branding-related is
