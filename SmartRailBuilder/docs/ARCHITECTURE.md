@@ -4440,3 +4440,219 @@ found none beyond expected comment lines and `pack.name`/`pack.description`, whi
   across any of its now-20 sessions. This session's own instructions were explicit that
   claiming otherwise would be dishonest; every "Validation Performed" section in this
   document, across every prior session, has said the same thing for the same reason.
+
+## 50. Polished Mobile UI & Build Configuration (Roadmap Phase 21, Project Prompt 21)
+
+### 50.1 — Scope: Polish the Existing 4-Screen Flow, Don't Rebuild It
+
+This session's brief was explicit that the engine and architecture were not to be
+touched — only the UI's text, validation messages, and a handful of small logic gaps. The
+existing `ui/BuildMenu.js` flow (mode → \[bridge material\] → configuration → summary,
+established Project Prompt 15 and extended in the bugfix pass before Project Prompt 18)
+was confirmed to already match the prompt's own "adapt the flow if the current
+architecture is better, don't create unnecessary forms" allowance — no new screens were
+added, no screen was removed. Every change this session is either a `.lang` text rewrite,
+a small `ResourceValidator`/`InventoryStage` substitutions change, or a genuinely new,
+small utility (`utils/BlockDisplayName.js`) extracted from duplicated logic. `BuildMenu.js`
+itself needed only its formatter import swapped to that new utility — no screen, no
+button, no slider was added, removed, or reordered.
+
+### 50.2 — Real Findings: Player-Facing Text Had Gone Stale
+
+A full line-by-line read of `RP/texts/en_US.lang` (never done end-to-end in one pass
+before) turned up three messages that were **factually false**, not just unpolished:
+
+- `menu.modeBody` still said Bridge/Underground were "configuration only this update;
+  construction is coming in a future update" — false since Project Prompt 16 (Bridge) and
+  Project Prompt 17 (Underground) respectively. Rewritten using the prompt's own suggested
+  wording for all three modes ("Build a standard railway along the terrain." / "Build an
+  elevated railway with supports." / "Build a protected railway tunnel underground.").
+- `path.rejected.tooSteep` said tunnel/bridge support "will be added in a future update" —
+  false since the same two prompts. Rewritten to actively point the player at the two real
+  alternatives that now exist: "Try Bridge Mode or Underground Mode instead."
+- `path.rejected.bridgeBlockedLiquid` said "underwater railways aren't supported yet" — this
+  one is confirmed **unreachable** dead text (`terrain/TerrainScanner.js` documents
+  `BridgeRejectionReason.BLOCKED_BY_LIQUID` as no longer produced, kept only as a
+  documented-superseded enum value per this project's established precedent for such
+  constants — see `config/RailConfig.js`'s `FALLBACK_MATERIAL_ID` history). Fixed anyway
+  since a dead string is still wrong the moment something ever reactivates that path.
+
+`mode.notYetAvailable` was deliberately left unchanged — unlike the three above, it is not
+currently false (unreachable today since all three modes are `implemented: true`, but would
+become accurate again the instant a genuine fourth, not-yet-built mode is added) — this
+matches the same "reserved for a real future case, not currently false" precedent already
+established elsewhere in this project.
+
+### 50.3 — Canonical Terminology: One Term Per Setting, Everywhere
+
+The prompt's Accessibility/Clarity section names the canonical setting terms explicitly:
+"Length", "Height", "Depth", "Material". The addon's own history had drifted from this —
+`menu.lengthLabel` had been "Rail Length" since Project Prompt 15 (itself a rename from
+"Railway Length"), and the height/depth sliders were labeled "Bridge Height"/"Underground
+Depth" while the summary screen already showed the same values under those longer labels
+too. All three slider/field labels were trimmed to the bare canonical term (`Length`,
+`Height`, `Depth`) — the mode name is already shown one line above on every screen that
+matters (`Mode: Bridge`), so the longer, qualified form was pure redundancy, not extra
+clarity. The two validation messages are the one deliberate exception: the prompt's own
+literal examples ("Bridge height must be between 1 and 16.", "Underground depth must be
+between 1 and 20.") use the qualified form, and were matched exactly rather than
+"corrected" to the bare term — a validation popup is exactly the context where naming which
+specific measurement failed is worth the extra word, and the prompt's own wording said so.
+
+### 50.4 — Validation Messages: Required/Available, Not "Need N More"
+
+`inventory.insufficient` and the new bridge-material equivalent used to say "You need N
+more" — a single derived number, not the Required/Available pair the prompt's examples
+show. `inventory/InventoryManager.js`'s `InventoryReport` already carried both
+`requiredQuantity` and `totalAvailable` (used internally, never surfaced); the fix was in
+`inventory/ResourceValidator.js`, whose `substitutions` array changed from
+`[missingQuantity]` to `[requiredQuantity, totalAvailable]`, and in the two `.lang` lines,
+rewritten to the exact two-line format the prompt specifies:
+```
+Not enough rails.
+Required: 20
+Available: 12
+```
+The bridge-material version needed one more piece: which material. `ResourceValidator`
+never sees a display name (it only sees a generic `InventoryReport`), so
+`core/pipeline/stages/InventoryStage.js`'s `_executeBridgeCheck()` now builds its own
+substitutions array, prepending the material's name via the new `formatBlockDisplayName()`
+utility, rather than forwarding `ResourceValidator`'s generic array directly:
+```
+Not enough Stone Bricks.
+Required: 84
+Available: 60
+```
+Both are still routed entirely through `LocalizationKeys`/`.lang` — no string is ever
+built inline in script code, matching this project's standing localization rule.
+
+### 50.5 — `utils/BlockDisplayName.js`: One Formatter, Not Two
+
+`ui/BuildMenu.js` already had a private `formatMaterialDisplayName()` (bridge material
+button labels, summary material line) that turns `"minecraft:stone_bricks"` into
+`"Stone Bricks"`. Building the Required/Available bridge-material message (§50.4) needed
+the exact same transform in `InventoryStage.js` — a second, independent copy of the same
+logic would have been created had it not been extracted first. `utils/BlockDisplayName.js`
+now holds the one implementation; `BuildMenu.js`'s private function was deleted and its two
+call sites updated to import the shared one instead. This is exactly the kind of
+duplication this session's self-review pass was asked to look for.
+
+### 50.6 — "Required Rails"/"Required Material": Honest, Not Fabricated
+
+The prompt's Build Preview example shows both `Required Rails: 20` and
+`Required Material: XX` on the pre-confirmation summary screen — but the prompt's own
+Performance section forbids calculating the entire route just to display a form, and only
+allows expensive planning after confirmation. These two requirements are in direct tension
+for Bridge Mode specifically: the real required-material count only exists once
+`terrain/TerrainScanner.js`'s `planBridge()` has walked the whole route
+(`core/pipeline/stages/TerrainScanningStage.js`, which runs strictly AFTER the summary
+screen, per the existing pipeline order) — showing a real number there would mean running
+that scan just to render a form.
+
+Resolved by splitting what's shown, and when:
+- **Required Rails**, pre-confirmation, on the summary screen — shown for all three modes,
+  using the requested length. This is cheap and already fully known at that point (it's
+  exactly what NORMAL mode's inventory check needs before any tunnel-style extension can
+  happen) — no new computation, no new substitution slot needed in `BuildMenu.js`; the
+  existing `length` value is simply reused a second time in the `.lang` line's substitution
+  positions.
+- **Bridge Material**, pre-confirmation — the summary line now reads
+  `Material: <name> (calculated automatically)` instead of a fabricated number, honestly
+  reflecting that the exact quantity isn't known yet.
+- **The real, final numbers**, post-confirmation — once `InventoryStage` has actually
+  verified the player has enough (meaning `TerrainScanningStage`'s scan has already run and
+  the true counts are known), it now sends one extra chat line revealing them:
+  `Required Rails: N` (all modes) and, for Bridge, `Required Rails: N | Required <Material>: M`
+  as a second chat line. This is the first point the real material count is truthfully
+  knowable, so it's the first point it's shown — fulfilling the prompt's "Required
+  Material: XX" example without violating its own Performance constraint.
+
+### 50.7 — Bridge Height / Underground Depth: Already Impossible to Set Out of Range
+
+The prompt asks the UI to make 0 or 21+ impossible to select for Underground Depth (and by
+the same logic, 0 or 17+ for Bridge Height). This was already true, structurally, before
+this session: `ui/BuildMenu.js`'s `promptForConfiguration()` builds its `ModalFormData`
+slider directly from `config/BuildModes.js`'s `BUILD_MODE_REGISTRY[mode].min/max`
+(1-16 for Bridge, 1-20 for Underground) — a Bedrock `ModalFormData` slider is a physical
+control that cannot report a value outside its own declared range, so there was no
+"validate the slider value" code to add. This session's new `tests/uiMenu.test.mjs`
+(§50.9) proves this two ways: the new `@minecraft/server-ui` mock's `ModalFormData` refuses
+to even construct a slider whose `defaultValue` is out of range, and refuses a scripted
+out-of-range submission the same way a real device could never produce one. Server-side
+re-validation (`core/validation/ModeConfigValidator.js`, unchanged) remains the
+authoritative check regardless — "never trust the UI" was already true and stays true.
+
+### 50.8 — No Unnecessary World Scans Added
+
+Reviewed every code path touched this session against the Performance requirement
+("don't scan the world just to show a form"): the mode screen, material screen, and
+configuration screen do no world reads at all (unchanged from every prior session); the
+summary screen's new "Required Rails" line reuses the already-known requested length
+(§50.6); the one new post-confirmation chat message is sent from inside
+`InventoryStage.execute()`/`_executeBridgeCheck()`, strictly after `TerrainScanningStage`
+has already run in the existing pipeline order — it reads values already computed for the
+inventory check itself, and triggers no additional scan of its own.
+
+### 50.9 — New Test Coverage: `tests/uiMenu.test.mjs` and the `@minecraft/server-ui` Mock
+
+Every session since Project Prompt 18 has listed "no mock exists for
+`@minecraft/server-ui`, so `ui/BuildMenu.js` itself is untested" as a known gap — this
+session, being UI-focused, is the natural point to close it. `node_modules/@minecraft/server-ui/`
+is a new test-only mock (same "never bundled into the .mcaddon" status as
+`node_modules/@minecraft/server/`, see `tests/README.md`) providing `ActionFormData`,
+`ModalFormData`, and `MessageFormData` with a per-player scripted-response queue
+(`queueFormResponse(player, response)`), keyed by player object identity so two players'
+scripted flows can never cross-contaminate — directly testing the multiplayer isolation
+requirement rather than just asserting it by inspection.
+
+`tests/uiMenu.test.mjs` (25 new assertions, all passing) exercises `ui/BuildMenu.js`
+directly for the first time: mode-screen button order/count and cancellation, Bridge
+Height/Underground Depth's physical impossibility of an out-of-range value (§50.7),
+NORMAL mode's config screen never showing a stray Height/Depth field, BRIDGE mode's
+two-field form mapping correctly, the material screen's selection-to-`typeId` mapping and
+cancellation, the summary screen's three-way distinct outcomes (Build / Cancel button /
+form simply closed — the "no accidental construction" contract), and genuine concurrent
+multiplayer isolation on the mode screen.
+
+### 50.10 — Regression Testing: All Prior Suites Still Pass
+
+`node --check` across every modified script file, and the full existing suite
+(`water.test.mjs`, `terrain.test.mjs`, `execution.test.mjs`, `integration.test.mjs` — 191
+assertions, unchanged from Project Prompt 20) all still pass unmodified, confirming the
+`ResourceValidator`/`InventoryStage` substitutions changes did not break any existing
+caller — no test in the prior suites asserted on the old `[missingQuantity]` shape
+directly (the one test touching `missingQuantity` reads it from `InventoryManager`'s own
+report object, untouched by this session's changes), only on the pipeline's pass/fail
+outcome and the correct `localizationKey`, both unaffected.
+
+### 50.11 — Known Limitations (disclosed, not hidden, carried forward from prior sessions)
+
+- The new `@minecraft/server-ui` mock is shape-only — it cannot confirm the two
+  visual-confirmation items already flagged in `ui/BuildMenu.js`'s own header: whether
+  `.body()` really renders a `{translate, with}` RawMessage with substituted values
+  in-game, and whether `textures/items/<shortName>` resolves for every possible bridge
+  material's button icon. Both remain open until a live client can be used.
+- Underground's best-effort landing-buffer/lateral water-seal limitations (§47.10) and the
+  neighbor-update side-effect question on pre-existing rails (§48.6) are unchanged — out of
+  scope for a UI-polish session.
+- **No in-game verification for anything in this or any prior session.** Every claim above
+  is a Node-only, mocked-world verification — see §50.12 and the Minecraft PE test checklist
+  delivered alongside this session's `.mcaddon`.
+
+### 50.12 — Validation Performed
+
+- `node --check` across every modified script file — 0 failures.
+- **216 assertions across 5 test files, all passing**: 55 (`water.test.mjs`, unchanged), 68
+  (`terrain.test.mjs`, unchanged), 39 (`execution.test.mjs`, unchanged), 29
+  (`integration.test.mjs`, unchanged), and 25 new (`uiMenu.test.mjs`).
+- Manual line-by-line read of the full `RP/texts/en_US.lang`, cross-checked against
+  `localization/LocalizationKeys.js` for orphaned/missing keys — 0 found.
+- The addon's `.mcaddon` was rebuilt and its internal structure verified (manifests parse
+  as valid JSON, all three version fields — `Constants.js`, `BP/manifest.json`,
+  `RP/manifest.json` — agree at 0.1.14, both `.mcpack` archives contain a `manifest.json`
+  at their own root, the outer `.mcaddon` contains exactly the two `.mcpack` files) — see
+  the delivered file and this session's final report for the exact result.
+- **Not yet confirmed in-game** — nothing in this project has been play-tested by a human
+  across any of its now-21 sessions. This session's own instructions were explicit that
+  claiming otherwise would be dishonest; every "Validation Performed" section in this
+  document, across every prior session, has said the same thing for the same reason.

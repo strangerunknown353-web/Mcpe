@@ -2,6 +2,7 @@ import { LocalizationKeys } from "../../../localization/LocalizationKeys.js";
 import { Logger } from "../../../utils/Logger.js";
 import { PipelineResult } from "../PipelineResult.js";
 import { BuildingMode } from "../../../config/BuildModes.js";
+import { formatBlockDisplayName } from "../../../utils/BlockDisplayName.js";
 
 /**
  * InventoryStage.js
@@ -66,6 +67,30 @@ import { BuildingMode } from "../../../config/BuildModes.js";
  *     substitutions (e.g. the missing quantity).
  *   - Never place blocks, never deduct items.
  *
+ * PROJECT PROMPT 21 — HONEST "REQUIRED RAILS/MATERIAL" REVEAL
+ *   ui/BuildMenu.js's Build Summary screen shows "Required Rails" using the
+ *   requested length (cheap, known before any scan) and, for Bridge Mode,
+ *   a material line reading "(calculated automatically)" instead of a real
+ *   quantity — showing a real number there would mean running planBridge()'s
+ *   full route scan just to render a form, which the UI polish pass's
+ *   Performance requirement forbids. The real numbers ARE known by the time
+ *   this stage's checks pass (TerrainScanningStage has already run), so this
+ *   stage sends one extra chat line on success revealing the actual
+ *   required Rails count (all modes) and, for Bridge, the actual required
+ *   material count too — the honest fulfillment of "Required Material: XX"
+ *   at the first point it's truthfully known.
+ *
+ * PROJECT PROMPT 21 — MATERIAL NAME IN THE BRIDGE MATERIAL REJECTION MESSAGE
+ *   ResourceValidator's substitutions are generic ([requiredQuantity,
+ *   totalAvailable]) since it never sees a material's display name. The
+ *   Bridge material rejection message ("Not enough Stone Bricks.\nRequired:
+ *   84\nAvailable: 60") needs the name prepended, so `_executeBridgeCheck()`
+ *   builds its own substitutions array here rather than forwarding
+ *   ResourceValidator's directly, using the same formatBlockDisplayName()
+ *   utility ui/BuildMenu.js uses for its material button labels (see that
+ *   utility's own header for why this was extracted rather than duplicated
+ *   a second time).
+ *
  * DEPENDENCIES
  *   - inventory/InventoryManager.js
  *   - inventory/ResourceValidator.js
@@ -73,6 +98,7 @@ import { BuildingMode } from "../../../config/BuildModes.js";
  *   - localization/LocalizationKeys.js
  *   - config/BuildModes.js (BuildingMode)
  *   - config/BridgeConfig.js (Project Prompt 16)
+ *   - utils/BlockDisplayName.js (Project Prompt 21)
  *   - ../PipelineResult.js
  *   - utils/Logger.js
  */
@@ -144,6 +170,7 @@ export class InventoryStage {
         `${report.railTypeId} (${validation.reason === "CREATIVE_BYPASS" ? "Creative bypass" : "Survival verified"}).`
     );
     this._messageService.sendActionBar(player, LocalizationKeys.ACTIONBAR_VALIDATION_SUCCESSFUL);
+    this._messageService.sendChat(player, LocalizationKeys.INVENTORY_REQUIRED_RAILS_SUMMARY, [report.requiredQuantity]);
     return PipelineResult.success();
   }
 
@@ -180,16 +207,20 @@ export class InventoryStage {
     const materialReport = this._inventoryManager.buildReport(player, bridgeMaterialId, plan.requiredSupportBlockCount);
     context.bridgeInventoryCheck = materialReport;
     const materialValidation = this._resourceValidator.validate(materialReport, gameMode);
+    const materialDisplayName = formatBlockDisplayName(bridgeMaterialId);
     if (!materialValidation.valid) {
       Logger.debug(
         `Bridge inventory check failed for ${player.name} (material): ${materialValidation.reason} ` +
           `(have ${materialReport.totalAvailable}, need ${materialReport.requiredQuantity}, missing ${materialReport.missingQuantity})`
       );
+      // Prepend the material's display name — ResourceValidator's own
+      // substitutions are generic ([requiredQuantity, totalAvailable]), it
+      // never sees a display name. See this file's header.
       return PipelineResult.validationFailed(
         this.name,
         materialValidation.reason,
         LocalizationKeys.INVENTORY_INSUFFICIENT_BRIDGE_MATERIAL,
-        materialValidation.substitutions
+        [materialDisplayName, ...materialValidation.substitutions]
       );
     }
 
@@ -199,6 +230,11 @@ export class InventoryStage {
         `(${railValidation.reason === "CREATIVE_BYPASS" ? "Creative bypass" : "Survival verified"}).`
     );
     this._messageService.sendActionBar(player, LocalizationKeys.ACTIONBAR_VALIDATION_SUCCESSFUL);
+    this._messageService.sendChat(player, LocalizationKeys.INVENTORY_REQUIRED_BRIDGE_SUMMARY, [
+      railReport.requiredQuantity,
+      materialDisplayName,
+      materialReport.requiredQuantity,
+    ]);
     return PipelineResult.success();
   }
 }

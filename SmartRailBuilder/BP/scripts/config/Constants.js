@@ -45,7 +45,7 @@ export const ADDON = Object.freeze({
   // this finding. Bumped to 0.1.13 this session (Project Prompt 20 — Full
   // Integration, Stability & Real-World Test Build); all three numbers
   // confirmed in sync.
-  VERSION: "0.1.13",
+  VERSION: "0.1.14",
 });
 
 /**

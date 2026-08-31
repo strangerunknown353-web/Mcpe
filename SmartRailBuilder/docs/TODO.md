@@ -510,6 +510,40 @@ genuine regression evidence, just not a re-run of the original files byte-for-by
       prior session: neighbor-update side effects on a pre-existing rail (§48.6) remain
       genuinely unconfirmable without a live client.
 
+## Completed — Roadmap Phase 21: Polished Mobile UI & Build Configuration ✅
+- [x] **Fixed three factually stale player-facing messages** — `menu.modeBody` and
+      `path.rejected.tooSteep` still claimed Bridge/Underground were "coming in a future
+      update," false since Prompts 16-17; rewritten to describe all three modes
+      accurately and point players at the real alternatives. §50.2.
+- [x] **Canonical terminology unified** — slider/summary labels trimmed to the bare
+      "Length"/"Height"/"Depth" the prompt's Accessibility section names explicitly; the
+      two validation messages keep the prompt's own fuller literal wording, matched
+      exactly. §50.3.
+- [x] **Validation messages rewritten to "Required: X / Available: Y"** for both rails
+      and (newly, naming the material) bridge material shortfalls. §50.4.
+- [x] **Added `utils/BlockDisplayName.js`** — one shared display-name formatter,
+      replacing a private duplicate inside `ui/BuildMenu.js`. §50.5.
+- [x] **Build summary now shows "Required Rails" pre-confirmation** (cheap, already
+      known) and reveals the real Bridge material quantity honestly in a new
+      post-confirmation chat message, once the real terrain scan has actually run —
+      never fabricated before it, respecting the "don't scan the world for a form"
+      constraint. §50.6/§50.8.
+- [x] **Confirmed, not changed**: Bridge Height (1-16)/Underground Depth (1-20) were
+      already structurally impossible to set out of range (slider bounds sourced
+      directly from the mode registry). §50.7.
+- [x] **Added a `@minecraft/server-ui` test mock + `tests/uiMenu.test.mjs`** (25 new
+      assertions) — closes the gap flagged in every session since Prompt 18; proves the
+      out-of-range slider impossibility, multiplayer isolation, and every screen's
+      cancellation path directly rather than by inspection. §50.9.
+- [x] 216 assertions across 5 test files, all passing. `node --check` clean.
+- [x] **New `.mcaddon` packaged, version 0.1.14** — structure verified.
+- [ ] **Awaiting your in-game test pass** — full numbered checklist delivered alongside
+      the `.mcaddon` in this session's final report. Same standing limitations as prior
+      sessions (§50.11): the two `ui/BuildMenu.js` visual-confirmation items
+      (`.body()` substitutions rendering, material button icon paths) and neighbor-update
+      side effects on a pre-existing rail (§48.6) remain unconfirmable without a live
+      client.
+
 ## ⚠️ Order Note (Pre-Prompt-18 Bug-Fix Pass)
 Uploaded with four specific bug reports and four screenshots, explicitly instructing
 "DO NOT START PROJECT PROMPT 18 YET." Honored — Project Prompt 18 was not started.
@@ -523,15 +557,16 @@ broken, the packaging fix (bugfix session) and the `.mcaddon` import itself rema
 right place to start ruling things out first, since nothing else can be verified until
 that works.
 
-## Up Next — Roadmap Phase 21+ (not started)
-(Per Project Prompt 20's own scope limit: integration/stabilization only, no new
-features, no blueprint/undo, no UI redesign. See ROADMAP.md's Phase 21+ backlog, still
-including underground tunnel lighting — ARCHITECTURE.md §45.12 — the two water-specific
-follow-ups noted in ARCHITECTURE.md §47.10, and a `@minecraft/server-ui` test mock so
-`ui/BuildMenu.js` can finally be covered (§49.8). Project Prompt 21 itself, whenever it
-arrives, is milestone-gated on your test pass of THIS session, per the project's
-standing workflow — including the one thing no session's tests can confirm without a
-live client: neighbor-update side effects on a pre-existing rail (§48.6/§49.8).)
+## Up Next — Roadmap Phase 22+ (not started)
+Per Project Prompt 21's own scope limit (UI/text polish only, no engine rebuild), the
+backlog is unchanged from before this session except that the `@minecraft/server-ui`
+test mock is now done (§50.9). See ROADMAP.md's Phase 22+ backlog: underground tunnel
+lighting (ARCHITECTURE.md §45.12), the two water-specific follow-ups (ARCHITECTURE.md
+§47.10), curved rails, undo, blueprint save/load, and the rest. Project Prompt 22 itself,
+whenever it arrives, is milestone-gated on your test pass of THIS session, per the
+project's standing workflow — including the items no session's tests can confirm without
+a live client: neighbor-update side effects on a pre-existing rail (§48.6), and the two
+`ui/BuildMenu.js` visual-confirmation items (§50.11).
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.
@@ -539,15 +574,16 @@ The checklist that used to live under this heading now lives under Phase 16, whe
 actual bridge engine has now been built. Heading kept, body intentionally emptied, for
 session-history continuity — not a second, duplicate copy of the same checklist.)
 
-## Backlog (Roadmap Phase 21+, not scheduled yet)
+## Backlog (Roadmap Phase 22+, not scheduled yet)
 - [ ] Curved rail placement (extends `RailPermutationBuilder.js`, per its own design notes)
 - [x] ~~Underwater railways~~ — done, Roadmap Phase 18 (Project Prompt 18). See
       ARCHITECTURE.md §47.
 - [ ] Sealing Underground Mode's best-effort landing buffer against water (currently
       just omitted when unsafe — ARCHITECTURE.md §47.10)
 - [ ] A wider (non-lateral-only) waterproof shell for large aquifer pockets, if needed
-- [ ] A `@minecraft/server-ui` test mock so `ui/BuildMenu.js` can be covered by an
-      automated test (ARCHITECTURE.md §49.8)
+- [x] ~~A `@minecraft/server-ui` test mock so `ui/BuildMenu.js` can be covered by an
+      automated test~~ — done, Roadmap Phase 21 (Project Prompt 21). See
+      ARCHITECTURE.md §50.9.
 - [ ] Undo system
 - [ ] Railway blueprint save/load
 - [ ] Railway templates

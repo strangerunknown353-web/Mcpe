@@ -84,6 +84,17 @@ export const LocalizationKeys = Object.freeze({
   PATH_REJECTED_BRIDGE_SUPPORT_HAZARD: "ryzenRailBuilder.path.rejected.bridgeSupportHazard",
   PATH_REJECTED_BRIDGE_SUPPORT_UNAVAILABLE: "ryzenRailBuilder.path.rejected.bridgeSupportUnavailable",
   INVENTORY_INSUFFICIENT_BRIDGE_MATERIAL: "ryzenRailBuilder.inventory.insufficientBridgeMaterial",
+  // Added Project Prompt 21 — post-confirmation "actual required quantity"
+  // reveal. See InventoryStage.js's REVISION HISTORY: the Build Summary
+  // screen (ui/BuildMenu.js's promptForSummary()) shows Bridge Mode's
+  // material line as "(calculated automatically)" rather than a real
+  // number, because the real number only exists after TerrainScanningStage
+  // has actually run (planBridge() walks the whole route) — which the
+  // Performance requirement forbids doing just to show a form. Once
+  // InventoryStage confirms the player has enough, the real count is finally
+  // known and honestly reportable, so it's sent here instead.
+  INVENTORY_REQUIRED_RAILS_SUMMARY: "ryzenRailBuilder.inventory.requiredRailsSummary",
+  INVENTORY_REQUIRED_BRIDGE_SUMMARY: "ryzenRailBuilder.inventory.requiredBridgeSummary",
 
   // --- Roadmap Phase 17: Advanced Underground Mode (Project Prompt 17) ---
   ACTIONBAR_PLANNING_UNDERGROUND: "ryzenRailBuilder.actionbar.planningUnderground",

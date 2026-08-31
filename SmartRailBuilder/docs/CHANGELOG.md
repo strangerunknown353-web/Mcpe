@@ -1064,3 +1064,68 @@ consecutive session on a base that has still never been confirmed in-game — se
 - **Not yet confirmed in-game** — this session's own instructions were explicit that
   claiming otherwise without an actual Minecraft launch would be dishonest; none of
   this project's 20 sessions has been play-tested by a human.
+
+### Project Prompt 21 — Polished Mobile UI & Build Configuration — 2026-08-31
+
+- **Fixed: three player-facing messages had gone factually stale.** `menu.modeBody` and
+  `path.rejected.tooSteep` both still claimed Bridge/Underground construction was
+  "coming in a future update" — false since Project Prompts 16-17. Rewritten to
+  accurately describe all three modes as real, and to point players at Bridge/
+  Underground as genuine alternatives when Normal Mode's terrain is too steep.
+  `path.rejected.bridgeBlockedLiquid` (confirmed unreachable dead text) was also
+  corrected. ARCHITECTURE.md §50.2.
+- **Unified terminology**: "Rail Length"/"Bridge Height"/"Underground Depth" slider
+  labels trimmed to the bare canonical terms ("Length"/"Height"/"Depth") the prompt's
+  Accessibility requirement names explicitly — the mode is already shown one line above
+  on every screen that matters, so the longer form was pure redundancy. The two
+  validation messages keep the prompt's own literal fuller wording ("Bridge height must
+  be between...") since a rejection popup is where naming the specific measurement is
+  worth it. ARCHITECTURE.md §50.3.
+- **Validation messages rewritten to "Required: X / Available: Y"** format (rails, and
+  now the bridge material insufficiency message too, which also names the material):
+  `Not enough rails.\nRequired: 20\nAvailable: 12` / `Not enough Stone Bricks.\nRequired:
+  84\nAvailable: 60`. `inventory/ResourceValidator.js`'s substitutions changed from a
+  single `[missingQuantity]` to `[requiredQuantity, totalAvailable]`.
+  `InventoryStage._executeBridgeCheck()` now builds its own substitutions array
+  prepending the material's display name. ARCHITECTURE.md §50.4.
+- **Added: `utils/BlockDisplayName.js`** — a shared "minecraft:stone_bricks" → "Stone
+  Bricks" formatter, extracted from a private duplicate inside `ui/BuildMenu.js`, now
+  used by both that file's material screen/summary and the new bridge-material
+  rejection message. ARCHITECTURE.md §50.5.
+- **Build summary now shows "Required Rails"** pre-confirmation (all three modes, using
+  the already-known requested length — no new world scan) and reveals the real Bridge
+  Mode material quantity honestly in a new post-confirmation chat message, sent once
+  `InventoryStage` confirms the player has enough (i.e., after the real terrain scan has
+  already run) — rather than fabricating a number before it's genuinely known, which
+  would have required scanning the whole route just to draw a form. ARCHITECTURE.md
+  §50.6/§50.8.
+- **Confirmed, not changed**: Bridge Height (1-16) and Underground Depth (1-20) were
+  already structurally impossible to set out of range — the `ModalFormData` slider is
+  built directly from `config/BuildModes.js`'s registry bounds, and a Bedrock slider
+  cannot report a value outside its own declared range. ARCHITECTURE.md §50.7.
+- **Added: `node_modules/@minecraft/server-ui` test mock** and **`tests/uiMenu.test.mjs`**
+  (25 new assertions) — closes the one gap flagged in every session's tests/README.md
+  since Project Prompt 18. Covers mode-screen button order/cancellation, the physical
+  impossibility of an out-of-range Height/Depth value, NORMAL mode's single-field
+  config screen, BRIDGE mode's two-field mapping, the material screen's selection
+  mapping, the summary screen's three distinct outcomes (Build/Cancel/closed), and
+  genuine concurrent multiplayer isolation. ARCHITECTURE.md §50.9.
+- **Files created:** `BP/scripts/utils/BlockDisplayName.js`,
+  `node_modules/@minecraft/server-ui/package.json`,
+  `node_modules/@minecraft/server-ui/index.js`, `tests/uiMenu.test.mjs`.
+- **Files modified:** `RP/texts/en_US.lang` (11 lines rewritten, 2 new lines added),
+  `BP/scripts/localization/LocalizationKeys.js` (2 new keys),
+  `BP/scripts/inventory/ResourceValidator.js` (richer substitutions),
+  `BP/scripts/core/pipeline/stages/InventoryStage.js` (material-name-prefixed rejection
+  message, new post-check chat summaries), `BP/scripts/ui/BuildMenu.js` (shared
+  formatter import, private duplicate removed), `tests/README.md` (new mock/suite
+  documented), `config/Constants.js` + both manifests (version 0.1.13 → 0.1.14).
+- **Packaged a new, testable `.mcaddon`** — version 0.1.14, structure verified
+  (manifests valid, all three version references agree, both `.mcpack` archives
+  correctly rooted, `.mcaddon` contains exactly the 2 expected `.mcpack` files).
+- **Validation:** 216 assertions across 5 test files (191 unchanged + 25 new), all
+  passing. `node --check` clean across every modified script file. Full detail in
+  ARCHITECTURE.md §50.12.
+- **Not yet confirmed in-game** — this session's own instructions were explicit that
+  claiming otherwise without an actual Minecraft launch would be dishonest; none of
+  this project's 21 sessions has been play-tested by a human.

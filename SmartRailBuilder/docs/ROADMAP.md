@@ -1089,7 +1089,37 @@ lengths 1/5/20/64, bridge heights 1/4/8/12/16, underground depths 1/5/10/15/20/2
 resource behavior, cancellation, and multiplayer — organized by this session's own
 Test Scenarios 1-13.
 
-## Phase 21+ — Reserved for Future Features (planned only when reached)
+## Phase 21 — Polished Mobile UI & Build Configuration (Project Prompt 21) — COMPLETE (awaiting in-game confirmation)
+
+Status: UI/text/validation polish pass, no engine or architecture rebuild. The existing
+4-screen flow (mode → \[bridge material\] → configuration → summary) was confirmed to
+already satisfy the prompt's flow/mobile-UX/cancellation/multiplayer-isolation
+requirements structurally — no screen was added, removed, or reordered. Real, concrete
+fixes made: three player-facing `.lang` strings that had gone factually stale (claiming
+Bridge/Underground were still "coming in a future update," years after both shipped);
+canonical terminology unified to "Length"/"Height"/"Depth"/"Material" everywhere per the
+Accessibility requirement; validation messages rewritten to the "Required: X / Available:
+Y" two-line format (rails and, newly, the named bridge material); a duplicated
+material-display-name formatter consolidated into one shared `utils/BlockDisplayName.js`;
+the summary screen now shows "Required Rails" pre-confirmation (cheap, already known) and
+the real Bridge material quantity is revealed honestly in a new post-confirmation chat
+line — once TerrainScanningStage has actually run — rather than fabricated before it,
+respecting the Performance requirement against scanning the world just to draw a form. A
+new `@minecraft/server-ui` test mock and `tests/uiMenu.test.mjs` finally close the one gap
+flagged in every session since Project Prompt 18: `ui/BuildMenu.js` is now covered by 25
+real assertions, including a structural proof that Bridge Height/Underground Depth can
+never be set to 0 or out-of-range values. See ARCHITECTURE.md §50 for the complete
+write-up. **A new, testable `.mcaddon` was packaged and delivered this session** — version
+0.1.14. 216 assertions across 5 test files, all passing; `node --check` clean.
+
+### Phase 21 Manual Testing Checklist
+See this session's final report (delivered alongside the `.mcaddon`) for the complete,
+numbered 16-item Minecraft PE testing checklist covering the mode screen, each mode's
+configuration screen, material selection and its automatic calculation, out-of-range
+rejection, cancellation, the build summary's accuracy, Survival vs. Creative, and two
+simultaneous players.
+
+## Phase 22+ — Reserved for Future Features (planned only when reached)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is
 currently dark and will spawn mobs; worth a deliberate decision) · cave-floor filling for
 Underground Mode (BridgeSupportBuilder is the natural reuse) · curved rails · undo
@@ -1100,9 +1130,7 @@ additional building modes beyond the three permanent ones (e.g. a future "Bluepr
 of these is a registry entry, not a rewrite) · sealing Underground's best-effort landing
 buffer against water too (currently just omitted when unsafe, see ARCHITECTURE.md
 §47.10) · a wider (not just lateral) waterproof shell for large aquifer pockets, if
-in-game testing shows the current thin seal is ever insufficient · a mock for
-`@minecraft/server-ui` so `ui/BuildMenu.js` can finally be covered by an automated test
-(see ARCHITECTURE.md §49.8).
+in-game testing shows the current thin seal is ever insufficient.
 
 Each of these gets the same treatment as Phases 2–15: design discussion first, one
 milestone at a time, your testing before moving on.

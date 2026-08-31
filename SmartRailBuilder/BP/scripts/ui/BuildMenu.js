@@ -3,6 +3,7 @@ import { BUILD_MODE_REGISTRY, BUILD_MODE_ORDER, BuildingMode } from "../config/B
 import { RAIL_TYPES } from "../config/RailConfig.js";
 import { LocalizationKeys } from "../localization/LocalizationKeys.js";
 import { DirectionUtils } from "../utils/DirectionUtils.js";
+import { formatBlockDisplayName } from "../utils/BlockDisplayName.js";
 import { Logger } from "../utils/Logger.js";
 
 /**
@@ -139,30 +140,6 @@ import { Logger } from "../utils/Logger.js";
  * @property {number} [length] Present only when cancelled is false.
  */
 
-/**
- * Formats a vanilla block type ID into a human-readable display name for
- * the material-selection screen — "minecraft:stone_bricks" ->
- * "Stone Bricks". Added in the bugfix pass before Project Prompt 18.
- *
- * Deliberately a plain-string transform, not a translate-key lookup — the
- * candidate list comes from the player's live inventory (any of hundreds
- * of possible vanilla blocks), so there is no fixed, pre-registerable set
- * of lang keys this could use, unlike RAIL_TYPES's own small, fixed
- * `displayName` list. Same "plain string for an inherently dynamic value"
- * reasoning already established for utils/DirectionUtils.js's own
- * `toDisplayName()` — see config/BuildModes.js's "NOTE ON displayName" for
- * the fuller version of this argument.
- * @param {string} typeId
- * @returns {string}
- */
-function formatMaterialDisplayName(typeId) {
-  return typeId
-    .replace(/^minecraft:/, "")
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
 export class BuildMenu {
   /**
    * STEP: Select Building Mode.
@@ -221,7 +198,7 @@ export class BuildMenu {
 
     for (const material of materials) {
       const shortName = material.typeId.replace(/^minecraft:/, "");
-      const label = `${formatMaterialDisplayName(material.typeId)} (x${material.totalAvailable})`;
+      const label = `${formatBlockDisplayName(material.typeId)} (x${material.totalAvailable})`;
       // See this file's header, MATERIAL BUTTON ICONS FLAGGED FOR VISUAL
       // CONFIRMATION — best-effort, non-blocking if this exact path is wrong.
       form.button(label, `textures/items/${shortName}`);
@@ -333,7 +310,7 @@ export class BuildMenu {
     let bodyKey;
     let substitutions;
     if (mode === BuildingMode.BRIDGE) {
-      const materialDisplayName = materialId ? formatMaterialDisplayName(materialId) : "";
+      const materialDisplayName = materialId ? formatBlockDisplayName(materialId) : "";
       bodyKey = LocalizationKeys.MENU_SUMMARY_BODY_BRIDGE;
       substitutions = [railDisplayName, modeDisplayName, materialDisplayName, modeValue, length, directionDisplayName];
     } else if (mode === BuildingMode.UNDERGROUND) {

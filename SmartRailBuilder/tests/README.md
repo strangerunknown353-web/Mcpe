@@ -15,6 +15,7 @@ node tests/water.test.mjs
 node tests/terrain.test.mjs
 node tests/execution.test.mjs
 node tests/integration.test.mjs
+node tests/uiMenu.test.mjs
 ```
 
 No dependencies, no build step — plain Node (22+), ESM (`.mjs`).
@@ -48,6 +49,20 @@ positions.
 `tests/mockPlayer.mjs` (Project Prompt 19) — a minimal in-memory `Player` +
 inventory `Container`, matching exactly the surface `InventoryManager.js`/
 `HeldItemValidator.js` actually call.
+
+`node_modules/@minecraft/server-ui/` (Project Prompt 21) — a test-only mock
+of `ActionFormData`/`ModalFormData`/`MessageFormData`, closing the one gap
+this file has listed as unsolved since Project Prompt 18. A test scripts a
+response per player with `queueFormResponse(player, response)` before
+triggering the code under test; queues are keyed per player object so two
+players' scripted flows never cross-contaminate (see `uiMenu.test.mjs`'s own
+multiplayer isolation test). `ModalFormData.show()` validates a scripted
+slider value against the field's own declared `[min, max]`/`valueStep` —
+the same structural guarantee a real physical slider provides — so a test
+proving "0 or 21+ is impossible to select" for Bridge Height/Underground
+Depth gets the same rejection a real device would produce, not a silent
+pass-through. See that package's own `index.js` header for the full
+rationale, and its own `NEVER bundled into the shipped .mcaddon` note.
 
 ## What's covered
 
@@ -133,12 +148,37 @@ pinning an explicit yaw and computing the real expected origin from
 `DirectionUtils`' own documented bands, rather than adjusting the assertion
 to match whatever the code happened to do.
 
+`uiMenu.test.mjs` (Project Prompt 21) — `ui/BuildMenu.js` directly, via the
+new `@minecraft/server-ui` mock:
+- Mode screen: button order/count matches `BUILD_MODE_ORDER` exactly, a real
+  selection maps back to the correct `BuildingMode`, cancellation never
+  returns a mode.
+- Configuration screen: Bridge Height (1-16) and Underground Depth (1-20)
+  are proven physically impossible to set to 0 or 21+ — the mock's slider
+  validation rejects it, and `BuildMenu` never lets that escape as a thrown
+  error (matching its own "never throw" contract), so it surfaces as a
+  cancelled config rather than a usable one. NORMAL mode's config screen
+  has exactly one field (Length) — no stray Height/Depth field appears.
+  BRIDGE mode's two-field form maps `formValues[0]`/`[1]` back to
+  `modeValue`/`length` correctly.
+- Material screen: selection maps back to the correct material `typeId`;
+  cancellation path reported correctly.
+- Summary screen: `selection: 0` (Build) vs `selection: 1` (Cancel button)
+  vs the form simply being closed are three distinct, correctly
+  distinguished outcomes — the "no accidental construction" contract.
+- Multiplayer isolation: two players' scripted mode-screen responses,
+  queued and shown concurrently, never cross-contaminate.
+
 ## What's NOT covered (known gaps, not solved this session)
 
-- `ui/BuildMenu.js` and anything using `@minecraft/server-ui`
-  (`ActionFormData`/`ModalFormData`/`MessageFormData`) — no mock exists for
-  that package yet. Form-building/UI flow is untested by this harness;
-  `integration.test.mjs` substitutes a scripted stub for `BuildMenu` instead.
+- The new `@minecraft/server-ui` mock is shape-only, same spirit as
+  `@minecraft/server`'s: no icon rendering, no real screen layout/timing,
+  and it cannot confirm the two items already flagged as "needs a live
+  client" in `ui/BuildMenu.js`'s own header — whether `.body()` actually
+  renders a `{translate, with}` RawMessage with real substituted values
+  in-game, and whether `textures/items/<shortName>` resolves for every
+  possible bridge material. Both remain visual-confirmation items, not
+  fixed by this harness.
 - Real Bedrock semantics this mock doesn't attempt to replicate: actual tick
   pacing (`system.runJob` here drains a generator to completion
   synchronously, not spread across ticks), real block update/neighbor-sensing

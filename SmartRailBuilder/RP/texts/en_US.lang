@@ -9,12 +9,14 @@ pack.description=Smart, survival-friendly railway construction.
 
 ## --- Roadmap Phase 3 ---
 ryzenRailBuilder.menu.title=Smart Rail Builder
-## "Railway Length" -> "Rail Length" (Project Prompt 15 terminology requirement:
-## "Use the same terminology everywhere: ... 'Rail Length' ..."). Key unchanged,
-## only the displayed text — every existing reference to MENU_LENGTH_LABEL
-## picks this up automatically.
-ryzenRailBuilder.menu.lengthLabel=Rail Length
-ryzenRailBuilder.menu.invalidLength=§cThat railway length isn't valid. Choose a value between %1$s and %2$s blocks.
+## "Rail Length" -> "Length" (Project Prompt 21 terminology requirement:
+## Accessibility/Clarity section names the canonical setting terms as
+## exactly "Length"/"Height"/"Depth"/"Material" — never a longer variant on
+## one screen and a shorter one elsewhere. Key unchanged, only the displayed
+## text — every existing reference to MENU_LENGTH_LABEL picks this up
+## automatically.
+ryzenRailBuilder.menu.lengthLabel=Length
+ryzenRailBuilder.menu.invalidLength=§cLength must be between %1$s and %2$s blocks.
 ryzenRailBuilder.validation.itemChanged=§cYou switched items before confirming — hold the rail item and try again.
 ryzenRailBuilder.validation.alreadyBuilding=§cYou already have a railway build in progress. Finish or cancel it first.
 ryzenRailBuilder.validation.notAllowed=§cYou're not allowed to build a railway here.
@@ -27,8 +29,8 @@ ryzenRailBuilder.validation.invalidDirection=§cCouldn't determine a valid build
 ryzenRailBuilder.validation.invalidOrigin=§cCouldn't determine a valid starting position. Please try again.
 
 ## --- Roadmap Phase 6 (Project Prompt 8) ---
-ryzenRailBuilder.inventory.insufficient=§cYou don't have enough rails. You need %1$s more.
-ryzenRailBuilder.path.rejected.tooSteep=§cTerrain too steep. Tunnel or bridge support will be added in a future update.
+ryzenRailBuilder.inventory.insufficient=§cNot enough rails.\nRequired: %1$s\nAvailable: %2$s
+ryzenRailBuilder.path.rejected.tooSteep=§cThis terrain is too steep for Normal Mode. Try Bridge Mode or Underground Mode instead.
 ryzenRailBuilder.path.rejected.hazard=§cThe path is blocked by a hazardous block (lava, fire, or similar).
 ryzenRailBuilder.path.rejected.unloaded=§cPart of the path isn't loaded. Move closer and try again.
 ryzenRailBuilder.path.rejected.outOfBounds=§cThe path would go outside the world's height limits.
@@ -54,19 +56,19 @@ ryzenRailBuilder.construction.complete=§aRailway complete! Placed %1$s blocks h
 ## --- Roadmap Phase 15: Three Building Modes & Unified Build Configuration UI (Project Prompt 15) ---
 ryzenRailBuilder.menu.nextButton=Next
 ryzenRailBuilder.menu.modeTitle=Select Building Mode
-ryzenRailBuilder.menu.modeBody=Choose how Smart Rail Builder should construct your railway:\n\n§lNormal§r - standard railway across existing terrain (flat ground, slopes, and auto-tunneled hills).\n§lBridge§r - elevated railway over gaps. Configuration only this update; construction is coming in a future update.\n§lUnderground§r - excavated railway below the surface. Configuration only this update; construction is coming in a future update.
+ryzenRailBuilder.menu.modeBody=Choose how Smart Rail Builder should build your railway:\n\n§lNormal§r - Build a standard railway along the terrain.\n§lBridge§r - Build an elevated railway with supports.\n§lUnderground§r - Build a protected railway tunnel underground.
 ryzenRailBuilder.mode.normal.label=Normal
 ryzenRailBuilder.mode.bridge.label=Bridge
 ryzenRailBuilder.mode.underground.label=Underground
-ryzenRailBuilder.menu.bridgeHeightLabel=Bridge Height
-ryzenRailBuilder.menu.undergroundDepthLabel=Underground Depth
-ryzenRailBuilder.menu.invalidHeight=§cThat bridge height isn't valid. Choose a value between %1$s and %2$s blocks.
-ryzenRailBuilder.menu.invalidDepth=§cThat underground depth isn't valid. Choose a value between %1$s and %2$s blocks.
+ryzenRailBuilder.menu.bridgeHeightLabel=Height
+ryzenRailBuilder.menu.undergroundDepthLabel=Depth
+ryzenRailBuilder.menu.invalidHeight=§cBridge height must be between %1$s and %2$s blocks.
+ryzenRailBuilder.menu.invalidDepth=§cUnderground depth must be between %1$s and %2$s blocks.
 ryzenRailBuilder.validation.invalidMode=§cSomething went wrong choosing a building mode. Please try again.
 ryzenRailBuilder.menu.summaryTitle=Build Summary
-ryzenRailBuilder.menu.summaryBody.normal=Rail: %1$s\nMode: %2$s\nLength: %3$s blocks\nDirection: %4$s
-ryzenRailBuilder.menu.summaryBody.bridge=Rail: %1$s\nMode: %2$s\nMaterial: %3$s\nBridge Height: %4$s blocks\nLength: %5$s blocks\nDirection: %6$s
-ryzenRailBuilder.menu.summaryBody.underground=Rail: %1$s\nMode: %2$s\nUnderground Depth: %3$s blocks\nLength: %4$s blocks\nDirection: %5$s
+ryzenRailBuilder.menu.summaryBody.normal=Rail: %1$s\nMode: %2$s\nLength: %3$s blocks\nRequired Rails: %3$s\nDirection: %4$s
+ryzenRailBuilder.menu.summaryBody.bridge=Rail: %1$s\nMode: %2$s\nMaterial: %3$s (calculated automatically)\nHeight: %4$s blocks\nLength: %5$s blocks\nRequired Rails: %5$s\nDirection: %6$s
+ryzenRailBuilder.menu.summaryBody.underground=Rail: %1$s\nMode: %2$s\nDepth: %3$s blocks\nLength: %4$s blocks\nRequired Rails: %4$s\nDirection: %5$s
 ryzenRailBuilder.menu.summaryBuildButton=Build
 ryzenRailBuilder.menu.summaryCancelButton=Cancel
 ryzenRailBuilder.mode.notYetAvailable=§e%1$s Mode is configured, but its construction engine isn't built yet — coming in a future update. Nothing was built this time.
@@ -82,10 +84,12 @@ ryzenRailBuilder.bridge.placingRails=Placing Rails...
 ryzenRailBuilder.path.rejected.bridgeBlockedTerrain=§cThe bridge path is blocked by terrain at the chosen height. Try a different height or location.
 ryzenRailBuilder.path.rejected.bridgeBlockedUnbreakable=§cThe bridge would need to build through an unbreakable block. Try a different height or location.
 ryzenRailBuilder.path.rejected.bridgeBlockedHazard=§cThe bridge path passes through a hazard (fire, lava, or similar). Try a different height or location.
-ryzenRailBuilder.path.rejected.bridgeBlockedLiquid=§cThe bridge deck would be underwater at that height — underwater railways aren't supported yet. Try a greater height.
+ryzenRailBuilder.path.rejected.bridgeBlockedLiquid=§cThe bridge deck would be underwater at that height. Try a greater height.
 ryzenRailBuilder.path.rejected.bridgeSupportHazard=§cA bridge support column would need to pass through lava or another hazard. Try a different height or location.
 ryzenRailBuilder.path.rejected.bridgeSupportUnavailable=§cNo solid ground was found close enough below the bridge to support it. Try a lower height.
-ryzenRailBuilder.inventory.insufficientBridgeMaterial=§cNot enough bridge material. You need %1$s more.
+ryzenRailBuilder.inventory.insufficientBridgeMaterial=§cNot enough %1$s.\nRequired: %2$s\nAvailable: %3$s
+ryzenRailBuilder.inventory.requiredRailsSummary=§7Required Rails: %1$s
+ryzenRailBuilder.inventory.requiredBridgeSummary=§7Required Rails: %1$s | Required %2$s: %3$s
 
 
 ## --- Roadmap Phase 17: Advanced Underground Mode (Project Prompt 17) ---

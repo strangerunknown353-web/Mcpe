@@ -30,7 +30,10 @@ import { LocalizationKeys } from "../localization/LocalizationKeys.js";
  * @property {boolean} valid
  * @property {string} reason "CREATIVE_BYPASS" | "SUFFICIENT" | "INSUFFICIENT_RAILS"
  * @property {string} [localizationKey] Present only when valid is false.
- * @property {(string|number)[]} [substitutions] Message parameters, e.g. [missingQuantity].
+ * @property {(string|number)[]} [substitutions] Message parameters: [requiredQuantity, totalAvailable] —
+ *   changed from a single [missingQuantity] Project Prompt 21, so rejection
+ *   messages can show the "Required: X / Available: Y" format the UI polish
+ *   pass asked for instead of a bare "need N more."
  */
 
 export class ResourceValidator {
@@ -49,7 +52,7 @@ export class ResourceValidator {
         valid: false,
         reason: "INSUFFICIENT_RAILS",
         localizationKey: LocalizationKeys.INVENTORY_INSUFFICIENT,
-        substitutions: [report.missingQuantity],
+        substitutions: [report.requiredQuantity, report.totalAvailable],
       };
     }
 
