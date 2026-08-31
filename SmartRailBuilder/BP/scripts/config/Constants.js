@@ -67,7 +67,19 @@ export const ADDON = Object.freeze({
   // top, no gameplay logic changed. Still explicitly NOT the final
   // release — Project Prompt 30 owns that designation. See CHANGELOG.md's
   // Project Prompt 29 entry.
-  VERSION: "0.1.22-rc2",
+  //
+  // FINAL RELEASE (Project Prompt 30): 1.0.0 — no "-rc" suffix, no
+  // pre-release label of any kind, per Project Prompt 30's explicit
+  // requirement that the shipped project not remain labeled rc/beta/test/
+  // development. The 0.1.x sequence that ran from Project Prompt 2 through
+  // the two release candidates ends here; 1.0.0 is the first (and, per the
+  // roadmap, final planned) stable release. All four numeric fields — this
+  // constant, BP/manifest.json's header + script module, and
+  // RP/manifest.json's header + resources module — are [1, 0, 0] and were
+  // bumped together, as this file's own standing rule has required since
+  // Project Prompt 15. See CHANGELOG.md's Project Prompt 30 entry and
+  // README.md.
+  VERSION: "1.0.0",
 });
 
 /**

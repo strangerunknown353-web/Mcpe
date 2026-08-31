@@ -1,5 +1,66 @@
 # Changelog — Smart Rail Builder (formerly Ryzen Rail Builder — renamed Project Prompt 10)
 
+## [1.0.0] — FINAL RELEASE — 2026-08-31
+
+The complete, released feature set. Per-session detail for every item below is in the dated
+entries further down this file; this section is the consolidated release summary.
+
+### Railway building
+- **Normal Mode** — straight railway following the terrain, in the direction the player faces.
+  Handles flat ground, ±1-block rises and drops with correctly-shaped sloped rails, and bores a
+  tunnel through rises too tall to climb. 1–64 blocks per build.
+- **Bridge Mode** — gradual ascent to a chosen height (1–16), a level crest across the gap, and
+  a gradual descent back to terrain. Lightweight piered structure (supports every 4 blocks)
+  rather than a solid filled mass; player-chosen bridge material; material requirement
+  calculated automatically; crosses water.
+- **Underground Mode** — descending ramp to a chosen depth (1–20) then a level run, with a
+  player-height corridor, clean entrance and exit, a landing pocket at the terminus, waterproof
+  sealing where the corridor cuts through water, and ore-aware excavation that refuses to
+  silently destroy valuable ores.
+- **All four vanilla rail types** — Rail, Powered Rail, Detector Rail, Activator Rail — in all
+  four cardinal directions.
+- **Underwater railways** and water-safe construction across all three modes.
+
+### Safety
+- Full-route validation before any block is placed; a failed validation modifies **zero** blocks.
+- Lava detection and rejection before excavation.
+- Existing rails of all four types are never overwritten — the build is planned around them.
+- Player structures (chests, containers, doors, beds, signs, furnaces, and similar) are
+  protected; an unsafe route is rejected rather than forced through.
+- Unbreakable blocks, unloaded chunks and out-of-bounds positions all rejected safely.
+- Terrain and inventory are re-verified immediately before construction, and again before every
+  single block placement, because a multi-tick build can outlive its own plan.
+
+### Resources
+- Survival: exact rail and bridge-material counts, deducted one item at a time and only after
+  the corresponding block is confirmed placed. No deduction on a rejected or cancelled build.
+- Creative: quantity checks bypassed entirely; the held rail type still determines what is built.
+- Interruption keeps what was already built and charges nothing beyond it — no rollback, no
+  refund, by design.
+
+### Multiplayer
+- Fully independent per-player UI, configuration, build plan, material, progress and job.
+- Overlapping build areas are rejected with a clear message rather than merged or corrupted.
+- Player leave, death, dimension change and game-mode change each cancel only that player's build.
+
+### Interface
+- Four-screen build flow (mode → material for Bridge → configuration → summary) with an explicit
+  Build/Cancel confirmation; invalid values rejected by both the UI and the backend.
+- Throttled action-bar progress and clear plain-English error messages for every failure path.
+
+### Performance
+- Construction runs through `system.runJob`, spread across ticks; no long synchronous loops.
+- Early-exit inventory checks, single-pass terrain scanning, and no duplicate re-scans.
+
+### Presentation
+- Official name **Smart Rail Builder**, pack icon for both packs, wordmark logo, branded menu
+  titles and completion messages.
+
+### Honest status at release
+No version of this add-on, including 1.0.0, has ever been run in a real Minecraft client.
+Verification is a 432-assertion Node.js suite against a mocked API, static analysis, and package
+validation. See `README.md`'s Known Limitations and ARCHITECTURE.md §59.7–§59.8.
+
 ## [Unreleased]
 
 ### Phase 1 — Foundation, Architecture & Planning — 2026-07-18
@@ -1504,3 +1565,50 @@ consecutive session on a base that has still never been confirmed in-game — se
   renders correctly and whether the lengthened titles display acceptably on a small screen
   are both flagged for your testing, not claimed as confirmed. Project Prompt 30 (final
   release) has NOT been started.
+
+### Project Prompt 30 — FINAL RELEASE v1.0.0 — 2026-08-31
+
+- **No functional code changed this session.** Per Project Prompt 30's own "only make changes
+  that are necessary or clearly beneficial" and "do not introduce risky rewrites" instructions,
+  the only edits are the version fields, a new `README.md`, and documentation. All 79 script
+  files behave identically to the Project Prompt 29 build.
+- **Ran the §28 final quality gate as an executable script, not from memory** — 37 checks
+  against the live source tree, **37 passed, 0 failed**: all 4 rail types registered; all 4
+  directions resolving to distinct unit step vectors with correct opposites; all 3 modes present
+  and `implemented: true`; every enforced limit (bridge height 1–16, underground depth 1–20,
+  length 1–64, tunnel clearances 2/3, pier spacing 4); all branding assets and strings;
+  localization parity (84 keys, 0 missing, 0 orphaned); and rail-intersection protection
+  independently confirmed in all three execution strategies plus `TerrainScanner`.
+  ARCHITECTURE.md §59.2.
+- **Final version 1.0.0.** All five version fields (`ADDON.VERSION`, BP header, BP script
+  module, BP's dependency-on-RP entry, RP header + resources module) set to `1.0.0`/`[1, 0, 0]`
+  and verified programmatically to agree. No `-rc`/`-beta`/`-test`/`-dev` suffix remains. The 4
+  entity UUIDs are unchanged — changing one at release would orphan existing installations.
+  ARCHITECTURE.md §59.3.
+- **Created `README.md`** — the project never had one. Covers what the add-on does, the three
+  modes and their real ranges, all four rail types, the bridge (16) and depth (20) limits,
+  step-by-step usage, Survival/Creative/multiplayer behavior, and a complete Known Limitations
+  section led by the disclosure that the add-on has never been run in a real client.
+  ARCHITECTURE.md §59.5.
+- **Consolidated release changelog** added at the top of this file (the `[1.0.0]` section),
+  summarising the complete shipped feature set per Project Prompt 30 §19.
+- **Naming settled without re-asking**: Project Prompt 30's text is internally inconsistent
+  (title/§29/§30/closing line say "Smart Rail Builder"; §2 says "Ryzen Rail Builder"). The user
+  answered this directly in Project Prompt 29 — Smart Rail Builder — and the dominant signal
+  here agrees. ARCHITECTURE.md §59.4.
+- **Files added:** `README.md`.
+- **Files modified:** `BP/scripts/config/Constants.js`, both manifests (0.1.22 → 1.0.0), and all
+  four docs.
+- **Packaged the final `.mcaddon`** — `SmartRailBuilder-v1.0.0.mcaddon`, structurally verified:
+  both `.mcpack` archives readable, manifests valid with all version fields at `[1, 0, 0]`, 4
+  distinct UUIDs, script entry point present, all 79 scripts present, both `pack_icon.png` assets
+  present and identical, localization present, zip integrity clean, and **zero development
+  artifacts** (`node_modules/`, `tests/`, `docs/`, `assets/` are all outside the two packaged
+  directories — confirmed by inspecting the archive listing).
+- **Validation:** 432 assertions across 9 test files, all passing — unchanged. `node --check`
+  clean across all 79 script files. ARCHITECTURE.md §59.7.
+- **Still not confirmed in-game.** No session in this project's 30-session history has ever run
+  the add-on in a real Minecraft client, and 1.0.0 ships with that stated plainly in its README
+  rather than hidden. The release is accompanied by a 20-part Minecraft PE test plan and a
+  structured bug-report format. Per Project Prompt 30 §29, no Phase 31 exists and none will be
+  invented; future work is user-requested only.

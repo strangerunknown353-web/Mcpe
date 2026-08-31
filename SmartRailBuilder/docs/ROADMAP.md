@@ -1389,10 +1389,45 @@ specifies — install, pack name/icon visibility, UI branding, and a full regres
 across all three modes, rail types, resource handling, and multiplayer, confirming nothing
 was accidentally broken by the branding changes.
 
-## Remaining Schedule (established by Project Prompt 26, Phases 27-29 now complete above)
+## Phase 30 Complete: FINAL RELEASE v1.0.0 ✅
+The last phase of the planned 30-prompt roadmap. A release session, not a development one: **no
+functional code changed** — the only edits were the version fields, a new `README.md`, and
+documentation, per Project Prompt 30's own "no risky rewrites at this stage" instruction. The
+§28 quality gate was run as an **executable script rather than answered from memory**: 37 checks
+covering all 4 rail types, all 4 directions (distinct unit step vectors + correct opposites),
+all 3 modes flagged implemented, every enforced limit (bridge 1–16, depth 1–20, length 1–64,
+tunnel clearances 2/3, pier spacing 4), all branding assets and strings, localization parity
+(84 keys, 0 missing, 0 orphaned), and rail-intersection protection in all three strategies plus
+the scanner — **37 passed, 0 failed**. Versioned **1.0.0** across all five version fields, with
+no `-rc`/`-beta`/`-test`/`-dev` suffix anywhere. `README.md` created (the project never had one)
+covering usage, all three modes and their real limits, Survival/Creative/multiplayer behavior,
+and a deliberately complete Known Limitations section led by the honest disclosure that no
+version of this add-on has ever been run in a real Minecraft client. **The final `.mcaddon` was
+packaged, structurally verified, and delivered** — `SmartRailBuilder-v1.0.0.mcaddon`. 432
+assertions across 9 test files, all passing; `node --check` clean across 79 script files; zero
+development artifacts in the shipped package. See ARCHITECTURE.md §59 for the complete write-up.
 
-- **Phase 30 — Final release polish, documentation, packaging, and final `.mcaddon`.** NOT
-  started — awaiting your gameplay testing of this session's branded build first.
+**Naming:** Project Prompt 30's text was internally inconsistent about the product name (title,
+§29, §30 and its required closing line say "Smart Rail Builder"; §2 says "Ryzen Rail Builder").
+The question was already put to the user directly in Phase 29 and answered — **Smart Rail
+Builder** — and the dominant signal in Prompt 30 agrees, so it was applied without re-asking.
+See ARCHITECTURE.md §59.4.
+
+### Phase 30 Final Test Plan
+See this session's final report for the complete 20-part Minecraft PE test plan (TEST 1–20:
+installation, pack icon/name, UI, rail types, directions, Normal, Bridge, bridge limits,
+Underground, underground limits, underwater, lava safety, resources, rail intersections,
+existing structures, cancellation, long builds, repeated builds, multiplayer, and a final
+general playtest), plus a structured bug-report format.
+
+## Roadmap Complete
+
+All 30 planned phases are done. The project is released at **v1.0.0** and has no in-flight work.
+Per Project Prompt 30's own instruction, no Phase 31 exists and none will be invented — any
+future work is user-requested, not roadmap-driven. The one thing the release does **not** have
+is real gameplay verification (no session in the project's history could launch Minecraft), so
+the 20-part test plan above is the natural next step, and any bug it surfaces would be handled
+as a user-requested fix rather than a new development phase.
 
 ## Phase 27+ Backlog (not scheduled to any specific phase yet)
 Underground tunnel lighting (see ARCHITECTURE.md §45.12 — the finished tunnel is

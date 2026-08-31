@@ -5930,3 +5930,131 @@ is expected to be an issue: whether `pack_icon.png` actually renders in the pack
 UI on your device (a purely visual confirmation no Node harness can perform), and whether the
 lengthened form titles (58.4) display acceptably on a small-screen mobile client without
 truncation — flagged for your testing, not claimed as confirmed.
+
+## 59. Final Release v1.0.0 (Roadmap Phase 30, Project Prompt 30)
+
+### 59.1 — Scope: Release, Not Development
+
+The last prompt of the planned 30-prompt roadmap. Project Prompt 30's own instruction set is
+explicit: no architecture redesign, no new gameplay features, no removed features, "only make
+changes that are necessary or clearly beneficial," and "do not introduce risky rewrites at this
+stage." Accordingly this session made **no functional code change at all** — the only edits are
+the version constant, the four manifest version fields, a new `README.md`, and documentation.
+The 432-assertion suite and all 79 script files are byte-identical in behavior to the Project
+Prompt 29 build that preceded them.
+
+### 59.2 — The Final Quality Gate, Run as Executable Checks
+
+Project Prompt 30 §28 lists 23 questions to answer before declaring completion. Rather than
+answer them from memory or from prior sessions' conclusions, the machine-checkable subset was
+written as an actual script and executed against the live source tree — **37 checks, 37
+passed, 0 failed**:
+
+- **Rail types (5 checks)** — all 4 vanilla rail IDs present in `RAIL_TYPES`, in
+  `RAIL_ITEM_IDS`, and in `RAIL_ITEM_ID_SET`; exactly 4, no more.
+- **Directions (4 checks)** — all 4 cardinals resolve to a distinct unit step vector of
+  magnitude 1, with a correct `opposite()` mapping (NORTH→(0,-1)/south, SOUTH→(0,1)/north,
+  EAST→(1,0)/west, WEST→(-1,0)/east).
+- **Modes (4 checks)** — NORMAL, BRIDGE and UNDERGROUND all present in `BUILD_MODE_REGISTRY`
+  with `implemented: true`; the registry lists exactly 3.
+- **Enforced limits (9 checks)** — bridge height min/max = 1/16, underground depth min/max =
+  1/20, length min/max = 1/64, tunnel rail clearance = 2, tunnel slope clearance = 3, and
+  `PIER_SPACING > 1` (the structural guarantee that a bridge is piered rather than a solid
+  filled mass — every 4 blocks).
+- **Branding (8 checks)** — `DISPLAY_NAME`, a set `VERSION`, both `pack_icon.png` files present
+  on disk, `pack.name`, both branded form titles, and exactly 3 branded completion messages.
+- **Localization parity (3 checks)** — 84 keys defined, 0 missing `.lang` entries, 0 orphaned
+  entries beyond the 2 expected pack-level ones.
+- **Rail intersection protection (4 checks)** — all three execution strategies AND
+  `TerrainScanner` each independently consult `RAIL_ITEM_ID_SET`, which is the structural
+  guarantee behind "an existing rail is never overwritten."
+
+This is the first session in the project's history where the feature/limit claims were verified
+by execution rather than by reading. Every claim held.
+
+### 59.3 — Final Version: 1.0.0
+
+The 0.1.x sequence that ran unbroken from Project Prompt 2 through both release candidates
+(0.1.21-rc1, 0.1.22-rc2) ends here. All **five** version fields — `ADDON.VERSION`,
+BP header, BP script module, BP's dependency-on-RP entry, and RP header + RP resources module —
+are `1.0.0` / `[1, 0, 0]`, verified programmatically to agree. No `-rc`, `-beta`, `-test` or
+`-dev` suffix remains anywhere, per Project Prompt 30 §17. The 4 entity UUIDs remain distinct
+and unchanged (changing a UUID at release would orphan every existing installation), and BP's
+dependency entry still correctly references RP's header UUID.
+
+### 59.4 — Naming: Smart Rail Builder (Settled)
+
+Project Prompt 30's text is internally inconsistent about the product name, exactly as Project
+Prompt 29's was: its title, its opening declaration ("The project name is officially: SMART RAIL
+BUILDER"), §29, §30's own report header, and its required closing line all say **Smart Rail
+Builder**, while §2 and two stray references say "Ryzen Rail Builder." The question was already
+put to the user directly during Project Prompt 29 and answered explicitly: **Smart Rail Builder
+is the official name** (see §58.2). The dominant signal in this prompt agrees with that answer,
+so it was applied without re-asking. The residual "Ryzen" references are treated as leftovers
+from the pre-Prompt-10 template, consistent with §58.2's finding. The internal
+`ryzenRailBuilder` localization-key namespace remains unchanged and player-invisible, for the
+reason given in Project Prompt 10 and restated in `Constants.js`: renaming it would touch every
+key in two files for zero player-facing benefit, and at a 1.0.0 release that is exactly the kind
+of gratuitous risk §1 forbids.
+
+### 59.5 — README.md (new)
+
+`README.md` was created this session at the project root (alongside `BP/`, `RP/`, `docs/`) —
+the project had never had one. Covers, per Project Prompt 30 §18: what the add-on does, the
+three modes with their real configurable ranges, all four rail types, the bridge height limit
+(16), the underground depth limit (20), step-by-step usage, Survival behavior (including the
+exact partial-build/no-refund policy), Creative behavior, multiplayer behavior, a deliberately
+complete Known Limitations section, and the version. Its limitations section leads with the
+single most important disclosure — that no version of this add-on has ever been run in a real
+Minecraft client — rather than burying it.
+
+### 59.6 — Packaging
+
+`SmartRailBuilder-v1.0.0.mcaddon`, built from the same two-`.mcpack` structure every prior
+release used. Verified after packaging: both `.mcpack` archives present and readable; both
+manifests parse as valid JSON with all version fields at `[1, 0, 0]`; 4 distinct entity UUIDs;
+script entry point `scripts/main.js` present; all 79 script files present; both `pack_icon.png`
+assets present, 256×256 RGBA, byte-identical; localization present; zip integrity clean on all
+three archives. **No development artifacts ship**: `node_modules/` (the test-only Minecraft API
+mock), `tests/`, `docs/`, `assets/` and the repository's own `.mcaddon` files are all outside
+`BP/` and `RP/`, which are the only two directories the packaging step reads — confirmed by
+inspecting the produced archive's file listing, not assumed.
+
+### 59.7 — Test Status at Release (honest)
+
+- **PASS (actually executed):** the Node.js test suite — 432 assertions across 9 files, all
+  passing — plus `node --check` on all 79 script files, the 37-check quality gate (59.2), the
+  localization parity check, the cross-registry contradiction check, and the packaged-archive
+  structural verification. These ran for real, in this environment, and their output is the
+  evidence.
+- **VALIDATED (static/structural, not executed):** manifest correctness, UUID uniqueness and
+  the BP→RP dependency link, API surface compatibility against the targeted stable
+  `@minecraft/server` 2.8.0 / `@minecraft/server-ui` 2.1.0 (unchanged since Project Prompt 27's
+  full review; deliberately not upgraded at release per §15), and pack structure.
+- **NEEDS USER TEST (everything else):** all actual gameplay. Every mode, every rail type, every
+  direction, every limit's real in-world behavior, the ascending-rail orientation, rail
+  crossings, resource deduction in a live inventory, cancellation and interruption, multiplayer,
+  and whether the pack icon renders. **None of this has been tested, in any of the project's 30
+  sessions, because no session has ever had the ability to launch Minecraft.**
+
+### 59.8 — Known Limitations at 1.0.0 (complete, unchanged)
+
+Every limitation carried forward from §58.10/§57.7/§56.9 remains open at release; none was
+resolved this session and none is hidden. In priority order for a first play session: the
+ascending `rail_direction` mapping (unconfirmed against real Bedrock — the single highest-risk
+assumption in the project); rail crossings not connecting on both lines, because vanilla has no
+4-way crossing rail (existing rails are protected, but continuity through a crossing is not
+guaranteed); neighbour-update re-shaping of a hand-placed rail adjacent to a newly placed one;
+ordinary-block player structures being undetectable; `player.dimension`/`Dimension.id` edge-case
+behavior; two `ui/BuildMenu.js` visual-layout items; whether `pack_icon.png` renders and whether
+the branded form titles fit a small mobile screen; the deliberate 64-block length ceiling;
+unlit underground tunnels; and en_US-only text. The full reasoning for each is in the sections
+that first disclosed it — none has been downgraded or reworded to sound better at release.
+
+### 59.9 — Project Close
+
+This is the final entry of the planned 30-prompt roadmap. The project is feature-complete as
+scoped, released at 1.0.0, and has no in-flight work. What it does not have is a single minute
+of real gameplay verification — which is why the release ships with a 20-part Minecraft PE test
+plan and a structured bug-report format rather than a claim of completion. Any future work is
+user-requested, not roadmap-driven.

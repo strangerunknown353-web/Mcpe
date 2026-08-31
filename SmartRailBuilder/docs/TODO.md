@@ -792,15 +792,41 @@ that works.
       whether the pack icon actually renders, and whether the lengthened form titles fit
       cleanly on a small mobile screen.
 
-## Up Next — Roadmap Phase 30: Final Release Preparation (NOT started)
-Per Project Prompt 29's own explicit instruction, Prompt 30 was NOT started this session. Per
-Project Prompt 29's own description, it is the FINAL RELEASE phase: final bug review, final
-regression, final documentation, final version, final manifests, final packaging, and the
-final `.mcaddon` — no longer a Release Candidate. Its primary input is your gameplay testing
-of this session's branded build (the 15-item checklist above); any real bug found there needs
-its own fix before Phase 30 can finalize anything. The items no session's tests can confirm
-without a live client (§58.10, carried from §57.7/§56.9) remain open regardless of branding
-work and are Phase 30's own natural last check before declaring the project done.
+## Completed — Roadmap Phase 30: FINAL RELEASE v1.0.0 ✅
+- [x] **No functional code changed** — only version fields, a new `README.md`, and docs, per
+      Prompt 30's "no risky rewrites at this stage". All 79 scripts behave identically to the
+      Prompt 29 build. §59.1.
+- [x] **§28 quality gate run as an executable script, not answered from memory** — 37 checks,
+      **37 passed, 0 failed**: 4 rail types, 4 directions (distinct step vectors + correct
+      opposites), 3 modes implemented, every enforced limit (bridge 1–16, depth 1–20, length
+      1–64, clearances 2/3, pier spacing 4), all branding assets/strings, localization parity
+      (84 keys, 0 missing, 0 orphaned), and rail-intersection protection in all 3 strategies
+      plus the scanner. §59.2.
+- [x] **Final version 1.0.0** across all five version fields, verified programmatically to
+      agree; no `-rc`/`-beta`/`-test`/`-dev` suffix anywhere; UUIDs deliberately unchanged.
+      §59.3.
+- [x] **`README.md` created** — usage, all three modes and real limits, Survival/Creative/
+      multiplayer behavior, and a complete Known Limitations section led by the "never run in a
+      real client" disclosure. §59.5.
+- [x] **Consolidated `[1.0.0]` release changelog** added at the top of CHANGELOG.md.
+- [x] **Final `.mcaddon` packaged and structurally verified** —
+      `SmartRailBuilder-v1.0.0.mcaddon`; both packs readable, manifests valid, 4 distinct UUIDs,
+      entry point + all 79 scripts + both pack icons + localization present, zip integrity
+      clean, **zero development artifacts shipped**. §59.6.
+- [x] 432 assertions across 9 test files, all passing. `node --check` clean across 79 files.
+- [ ] **Awaiting your gameplay testing** — the 20-part Minecraft PE test plan delivered in this
+      session's final report, plus the structured bug-report format. This is the one thing the
+      release genuinely lacks: **no session in the project's 30-session history has ever run the
+      add-on in a real Minecraft client.** Highest-priority items to watch: ascending rail
+      orientation, rail crossings, and whether the pack icon renders. §59.7–§59.8.
+
+## Project Status: RELEASED — no in-flight work
+All 30 planned roadmap phases are complete and the project is released at **v1.0.0**. Per
+Project Prompt 30 §29, there is no Phase 31 and none will be invented. The backlog below is
+retained as a record of deliberately-unbuilt ideas, **not** as scheduled work — nothing in it
+is planned, and any of it would only happen if you specifically request it as a future update.
+The most likely real next step is not a feature at all: it is fixing whatever your first
+gameplay test session finds.
 
 ## Up Next — Roadmap Phase 14: Bridge Placement
 (Superseded by the Phase 15/16/17 split above — see the Order Note higher in this file.
